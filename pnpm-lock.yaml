@@ -82,6 +82,31 @@ importers:
         specifier: ^4.1.8
         version: 4.1.8(@types/node@22.19.21)(vite@8.0.16(@types/node@22.19.21)(esbuild@0.27.7)(tsx@4.22.4))
 
+  packages/quietcut-server:
+    dependencies:
+      execa:
+        specifier: ^9.5.2
+        version: 9.6.1
+      quietcut-core:
+        specifier: workspace:*
+        version: link:../quietcut-core
+    devDependencies:
+      '@types/node':
+        specifier: ^22.15.18
+        version: 22.19.21
+      tsup:
+        specifier: ^8.4.0
+        version: 8.5.1(postcss@8.5.15)(tsx@4.22.4)(typescript@5.9.3)
+      tsx:
+        specifier: ^4.19.4
+        version: 4.22.4
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
+      vitest:
+        specifier: ^4.1.8
+        version: 4.1.8(@types/node@22.19.21)(vite@8.0.16(@types/node@22.19.21)(esbuild@0.27.7)(tsx@4.22.4))
+
 packages:
 
   '@anthropic-ai/sdk@0.104.1':
