@@ -1,9 +1,11 @@
 // Public API for quietcut-core.
-// Phase 1.2 — initial export surface. The runSmartcut async generator
-// and pipeline event types are added in Phase 1.3 / 1.4.
+// Phase 1.3 — pipeline event types are exported.
+// The runSmartcut async generator is added in Phase 1.4.
 
 export * from "./types.js";
 export * from "./edit-plan.js";
+export type { PipelineEvent, Stage } from "./pipeline/events.js";
+export type { RetakeDecision } from "./pipeline/decisions.js";
 export * from "./segments.js";
 export { detectSilences } from "./detect.js";
 export { render } from "./render.js";
