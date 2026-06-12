@@ -20,3 +20,8 @@ export {
   getDuration,
   extractAudio,
 } from "./utils/ffmpeg.js";
+export {
+  defaultSmartcutOutput,
+  warnIfUnsupportedContainer,
+} from "./utils/paths.js";
+export { formatDuration, formatTime } from "./utils/time.js";
