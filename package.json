@@ -1,0 +1,16 @@
+{
+  "name": "smartcut",
+  "version": "0.1.0",
+  "private": true,
+  "description": "SmartCut — native macOS app wrapping the quietcut smartcut pipeline.",
+  "scripts": {
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test",
+    "dev:cli": "pnpm --filter quietcut-cli dev"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "packageManager": "pnpm@9.0.0"
+}

@@ -1,0 +1,1092 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>SmartCut — UI Mockup</title>
+<style>
+  :root {
+    --bg: #1c1c1e;
+    --panel: #2c2c2e;
+    --panel-2: #3a3a3c;
+    --text: #f2f2f7;
+    --dim: #98989d;
+    --dimmer: #636366;
+    --accent: #0a84ff;
+    --green: #30d158;
+    --red: #ff453a;
+    --yellow: #ffd60a;
+    --border: #38383a;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: #0a0a0c;
+    color: var(--text);
+    font: 13px/1.4 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+    -webkit-font-smoothing: antialiased;
+    min-height: 100vh;
+  }
+
+  /* ---------- State switcher (above the simulated window) ---------- */
+  .switcher {
+    max-width: 1080px;
+    margin: 32px auto 16px;
+    padding: 0 24px;
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  .switcher-label {
+    color: var(--dim);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-right: 8px;
+  }
+  .switcher button {
+    background: var(--panel);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 6px 12px;
+    cursor: pointer;
+    font: inherit;
+    font-size: 12px;
+  }
+  .switcher button.active {
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+
+  /* ---------- Window chrome ---------- */
+  .window {
+    max-width: 1080px;
+    height: 720px;
+    margin: 0 auto 48px;
+    background: var(--bg);
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow:
+      0 1px 0 rgba(255,255,255,0.06) inset,
+      0 20px 60px rgba(0,0,0,0.6),
+      0 4px 16px rgba(0,0,0,0.4);
+    display: grid;
+    grid-template-rows: 38px 1fr;
+  }
+  .titlebar {
+    background: linear-gradient(180deg, #3a3a3c, #2c2c2e);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    padding: 0 12px;
+    position: relative;
+  }
+  .traffic {
+    display: flex;
+    gap: 8px;
+  }
+  .traffic span {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    display: block;
+  }
+  .traffic .r { background: #ff5f57; border: 0.5px solid rgba(0,0,0,0.2); }
+  .traffic .y { background: #febc2e; border: 0.5px solid rgba(0,0,0,0.2); }
+  .traffic .g { background: #28c840; border: 0.5px solid rgba(0,0,0,0.2); }
+  .title {
+    position: absolute;
+    left: 0; right: 0;
+    text-align: center;
+    color: var(--dim);
+    font-weight: 500;
+    font-size: 13px;
+    pointer-events: none;
+  }
+
+  /* ---------- Layout (sidebar + content) ---------- */
+  main.layout {
+    display: grid;
+    grid-template-columns: 260px 1fr;
+    overflow: hidden;
+    height: 100%;
+  }
+  aside {
+    background: var(--panel);
+    border-right: 1px solid var(--border);
+    padding: 18px 16px;
+    overflow-y: auto;
+  }
+  aside h3 {
+    margin: 0 0 10px;
+    font-size: 11px;
+    text-transform: uppercase;
+    color: var(--dim);
+    letter-spacing: 0.6px;
+    font-weight: 600;
+  }
+  .step {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    padding: 8px 10px;
+    border-radius: 6px;
+    margin-bottom: 2px;
+  }
+  .step.active {
+    background: var(--panel-2);
+  }
+  .step .dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--border);
+    flex-shrink: 0;
+    position: relative;
+  }
+  .step.done .dot { background: var(--green); }
+  .step.active .dot {
+    background: var(--accent);
+    box-shadow: 0 0 0 0 rgba(10, 132, 255, 0.6);
+    animation: pulse 1.6s infinite;
+  }
+  .step.fail .dot { background: var(--red); }
+  @keyframes pulse {
+    0% { box-shadow: 0 0 0 0 rgba(10, 132, 255, 0.5); }
+    70% { box-shadow: 0 0 0 8px rgba(10, 132, 255, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(10, 132, 255, 0); }
+  }
+  .step .label { flex: 1; }
+  .step .label .meta {
+    color: var(--dim);
+    font-size: 11px;
+    margin-top: 2px;
+  }
+
+  .settings-block {
+    color: var(--dim);
+    font-size: 12px;
+    line-height: 1.9;
+  }
+  .settings-block strong { color: var(--text); font-weight: 500; }
+
+  /* ---------- Content area ---------- */
+  section.content {
+    padding: 28px 36px;
+    overflow-y: auto;
+  }
+  section.content h2 {
+    margin: 0 0 6px;
+    font-size: 20px;
+    font-weight: 600;
+  }
+  section.content .subtitle {
+    color: var(--dim);
+    margin-bottom: 24px;
+  }
+
+  /* ---------- Drop zone ---------- */
+  .dropzone {
+    border: 2px dashed var(--border);
+    border-radius: 14px;
+    padding: 64px 24px;
+    text-align: center;
+    color: var(--dim);
+    transition: border-color 0.2s, background 0.2s;
+  }
+  .dropzone.idle:hover { border-color: var(--accent); color: var(--text); }
+  .dropzone .icon { font-size: 48px; margin-bottom: 16px; }
+  .dropzone h2 { font-size: 18px; font-weight: 500; color: var(--text); margin: 0 0 8px; }
+  .dropzone p { margin: 0; font-size: 13px; }
+  .dropzone .or { margin: 16px 0; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--dimmer); }
+
+  .file-card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px 20px;
+    display: flex;
+    gap: 16px;
+    align-items: center;
+    margin-bottom: 20px;
+  }
+  .file-card .thumb {
+    width: 48px; height: 48px;
+    border-radius: 8px;
+    background: linear-gradient(135deg, #5e5ce6, #bf5af2);
+    display: grid; place-items: center;
+    font-size: 22px;
+    flex-shrink: 0;
+  }
+  .file-card .name { font-weight: 600; font-size: 14px; }
+  .file-card .meta { color: var(--dim); font-size: 12px; margin-top: 3px; }
+
+  /* ---------- Settings form ---------- */
+  .form {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px 24px;
+    margin-bottom: 20px;
+  }
+  .form h3 {
+    margin: 0 0 16px;
+    font-size: 13px;
+    color: var(--dim);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 600;
+  }
+  .row {
+    display: grid;
+    grid-template-columns: 180px 1fr;
+    align-items: center;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .row:last-child { border-bottom: none; }
+  .row label { color: var(--text); font-size: 13px; }
+  .row label .hint { display: block; color: var(--dim); font-size: 11px; margin-top: 2px; }
+  .row input, .row select {
+    background: var(--bg);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 6px 10px;
+    font: inherit;
+    font-size: 13px;
+    width: 100%;
+    max-width: 280px;
+  }
+  .row .inline {
+    display: flex; gap: 8px; align-items: center;
+  }
+  .row .inline input { max-width: 100px; }
+  .row .unit { color: var(--dim); font-size: 12px; }
+
+  /* ---------- Buttons ---------- */
+  .btn {
+    padding: 8px 14px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--panel-2);
+    color: var(--text);
+    cursor: pointer;
+    font: inherit;
+    font-size: 13px;
+    transition: all 0.1s;
+  }
+  .btn:hover { background: #48484a; }
+  .btn.primary { background: var(--accent); border-color: var(--accent); }
+  .btn.primary:hover { background: #0070e6; }
+  .btn.danger { background: var(--red); border-color: var(--red); }
+  .btn.ghost { background: transparent; }
+  .btn.large { padding: 11px 20px; font-size: 14px; font-weight: 500; }
+  .btn[disabled] { opacity: 0.5; cursor: not-allowed; }
+
+  .button-row {
+    display: flex; gap: 10px;
+    margin-top: 8px;
+  }
+
+  /* ---------- Pipeline running banner ---------- */
+  .banner {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 18px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 16px;
+  }
+  .banner.banner-info { border-left: 3px solid var(--accent); }
+  .banner.banner-success { border-left: 3px solid var(--green); }
+  .spinner {
+    width: 16px; height: 16px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .log {
+    background: #141416;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 14px;
+    font-family: "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+    font-size: 11.5px;
+    line-height: 1.6;
+    color: var(--dim);
+    margin-bottom: 20px;
+    max-height: 200px;
+    overflow-y: auto;
+  }
+  .log .ok { color: var(--green); }
+  .log .info { color: var(--accent); }
+  .log .warn { color: var(--yellow); }
+  .log .dim { color: var(--dimmer); }
+
+  /* ---------- Retake review card ---------- */
+  .cut-progress {
+    display: flex; align-items: center; gap: 14px;
+    margin-bottom: 16px;
+  }
+  .cut-progress .bar {
+    flex: 1;
+    height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .cut-progress .bar > div {
+    height: 100%;
+    background: var(--accent);
+    transition: width 0.3s;
+  }
+  .cut-progress .count {
+    color: var(--dim);
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .cut-card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px 22px;
+    margin-bottom: 12px;
+  }
+  .cut-card.upcoming {
+    opacity: 0.4;
+    padding: 14px 22px;
+  }
+  .cut-card header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 16px;
+    gap: 16px;
+  }
+  .cut-card h3 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
+  }
+  .timestamp {
+    color: var(--dim);
+    font-family: "SF Mono", monospace;
+    font-size: 12px;
+  }
+  .duration-chip {
+    background: rgba(255, 69, 58, 0.15);
+    color: var(--red);
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-family: "SF Mono", monospace;
+    font-size: 12px;
+    font-weight: 500;
+  }
+  .confidence {
+    color: var(--dim);
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .conf-bar {
+    width: 80px; height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .conf-bar > div { height: 100%; background: var(--green); }
+
+  .field-label {
+    color: var(--dim);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin: 14px 0 6px;
+    font-weight: 600;
+  }
+  .removed-text {
+    color: #ff7b73;
+    text-decoration: line-through;
+    text-decoration-color: rgba(255, 69, 58, 0.6);
+    line-height: 1.6;
+  }
+  .reason {
+    color: var(--dim);
+    line-height: 1.6;
+  }
+  .stitched {
+    background: var(--bg);
+    border-radius: 8px;
+    padding: 12px 16px;
+    line-height: 1.7;
+    font-size: 13.5px;
+  }
+  .stitched .context { color: var(--dimmer); }
+  .stitched .kept {
+    color: #5fdb85;
+    background: rgba(48, 209, 88, 0.08);
+    padding: 1px 4px;
+    border-radius: 3px;
+  }
+
+  .audio-row {
+    display: flex; gap: 10px; margin-top: 14px;
+  }
+  .audio-btn {
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 7px 13px;
+    border-radius: 6px;
+    cursor: pointer;
+    font: inherit;
+    font-size: 12px;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+  }
+  .audio-btn:hover { background: #48484a; }
+  .audio-btn .play-icon {
+    color: var(--green);
+    font-size: 11px;
+  }
+  .audio-waveform {
+    display: inline-flex;
+    align-items: center;
+    gap: 1.5px;
+    margin-left: 4px;
+    height: 14px;
+  }
+  .audio-waveform span {
+    width: 2px;
+    background: var(--dim);
+    border-radius: 1px;
+    display: inline-block;
+  }
+
+  .actions {
+    display: flex; gap: 8px;
+    margin-top: 18px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+  }
+  kbd {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-bottom-width: 2px;
+    border-radius: 4px;
+    padding: 1px 6px;
+    font-size: 10.5px;
+    color: var(--dim);
+    font-family: "SF Mono", monospace;
+    margin-left: 6px;
+    line-height: 1;
+    display: inline-block;
+  }
+
+  /* ---------- Render progress ---------- */
+  .render-card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 28px;
+    text-align: center;
+  }
+  .progress-bar {
+    height: 8px;
+    background: var(--border);
+    border-radius: 4px;
+    overflow: hidden;
+    margin: 20px 0 12px;
+  }
+  .progress-bar > div {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent), #5e5ce6);
+    transition: width 0.3s;
+  }
+  .progress-stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    margin-top: 20px;
+  }
+  .stat {
+    text-align: center;
+  }
+  .stat .value {
+    font-size: 18px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+  .stat .label {
+    color: var(--dim);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-top: 4px;
+  }
+
+  /* ---------- Done screen ---------- */
+  .done-card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 32px;
+    text-align: center;
+  }
+  .done-card .check {
+    width: 56px; height: 56px;
+    background: rgba(48, 209, 88, 0.15);
+    border-radius: 50%;
+    display: grid; place-items: center;
+    margin: 0 auto 16px;
+    font-size: 28px;
+    color: var(--green);
+  }
+  .done-card h2 {
+    margin: 0 0 8px;
+  }
+  .done-card .summary-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    margin: 24px 0;
+    text-align: left;
+  }
+  .summary-tile {
+    background: var(--bg);
+    border-radius: 8px;
+    padding: 14px 16px;
+  }
+  .summary-tile .label {
+    color: var(--dim);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 6px;
+  }
+  .summary-tile .value {
+    font-size: 17px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+  .summary-tile .value.green { color: var(--green); }
+
+  /* ---------- Helpers ---------- */
+  .screen { display: none; height: 100%; }
+  .screen.active { display: grid; grid-template-columns: 260px 1fr; }
+  .footnote { color: var(--dimmer); font-size: 11px; margin-top: 32px; text-align: center; }
+</style>
+</head>
+<body>
+
+<div class="switcher">
+  <span class="switcher-label">Preview screen:</span>
+  <button data-target="drop" class="active">1. Drop file</button>
+  <button data-target="settings">2. Settings</button>
+  <button data-target="running">3. Pipeline running</button>
+  <button data-target="review">4. Review retakes</button>
+  <button data-target="render">5. Rendering</button>
+  <button data-target="done">6. Done</button>
+</div>
+
+<div class="window">
+  <div class="titlebar">
+    <div class="traffic"><span class="r"></span><span class="y"></span><span class="g"></span></div>
+    <div class="title" id="window-title">SmartCut</div>
+    <div style="width:60px"></div>
+  </div>
+
+  <!-- ============================== SCREEN 1: DROP ============================== -->
+  <main class="screen active" data-screen="drop">
+    <aside>
+      <h3>Recent files</h3>
+      <div class="settings-block">
+        <div style="padding: 6px 0;">interview-jan-12.mp4</div>
+        <div style="padding: 6px 0;">tutorial-rough.mov</div>
+        <div style="padding: 6px 0;">demo-take-3.mp4</div>
+      </div>
+
+      <h3 style="margin-top: 28px;">Status</h3>
+      <div class="settings-block">
+        <strong>ffmpeg:</strong> ready<br>
+        <strong>whisper:</strong> base.en<br>
+        <strong>API key:</strong> configured
+      </div>
+    </aside>
+    <section class="content" style="display: flex; align-items: center; justify-content: center;">
+      <div style="width: 100%; max-width: 520px;">
+        <div class="dropzone idle">
+          <div class="icon">🎬</div>
+          <h2>Drop a video here</h2>
+          <p>Supported: .mp4, .mov, .mkv, .webm</p>
+          <div class="or">or</div>
+          <button class="btn">Choose file…</button>
+        </div>
+        <p style="text-align: center; color: var(--dim); margin-top: 20px; font-size: 12px;">
+          SmartCut will detect silence and AI-flagged retakes, then let you review each cut.
+        </p>
+      </div>
+    </section>
+  </main>
+
+  <!-- ============================== SCREEN 2: SETTINGS ============================== -->
+  <main class="screen" data-screen="settings">
+    <aside>
+      <h3>Pipeline</h3>
+      <div class="step"><div class="dot"></div><div class="label">File loaded<div class="meta">12:34 · 412 MB</div></div></div>
+      <div class="step"><div class="dot"></div><div class="label">Audio extract</div></div>
+      <div class="step"><div class="dot"></div><div class="label">Silence detect</div></div>
+      <div class="step"><div class="dot"></div><div class="label">Transcribe</div></div>
+      <div class="step"><div class="dot"></div><div class="label">Detect retakes</div></div>
+      <div class="step"><div class="dot"></div><div class="label">Review</div></div>
+      <div class="step"><div class="dot"></div><div class="label">Render</div></div>
+
+      <h3 style="margin-top: 24px;">Presets</h3>
+      <div class="settings-block">
+        <div style="padding: 5px 0; color: var(--text);">▸ Interview</div>
+        <div style="padding: 5px 0;">▸ Tutorial</div>
+        <div style="padding: 5px 0;">▸ Live demo</div>
+        <div style="padding: 5px 0;">▸ Custom…</div>
+      </div>
+    </aside>
+    <section class="content">
+      <h2>Review settings</h2>
+      <p class="subtitle">These mirror the <code>quietcut smartcut</code> CLI flags. Defaults match the CLI.</p>
+
+      <div class="file-card">
+        <div class="thumb">🎬</div>
+        <div style="flex: 1;">
+          <div class="name">interview.mp4</div>
+          <div class="meta">12:34 · 1080p · H.264 · 412 MB · 30 fps</div>
+        </div>
+        <button class="btn ghost">Change…</button>
+      </div>
+
+      <div class="form">
+        <h3>Silence detection</h3>
+        <div class="row">
+          <label>Threshold
+            <span class="hint">Below this is considered silence</span>
+          </label>
+          <div class="inline">
+            <input type="number" value="-30" />
+            <span class="unit">dB</span>
+          </div>
+        </div>
+        <div class="row">
+          <label>Minimum length
+            <span class="hint">Cut silences this long or longer</span>
+          </label>
+          <div class="inline">
+            <input type="number" value="0.6" step="0.1" />
+            <span class="unit">seconds</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="form">
+        <h3>AI retake detection</h3>
+        <div class="row">
+          <label>Model</label>
+          <select>
+            <option>claude-opus-4-8</option>
+            <option>claude-sonnet-4-5</option>
+            <option>claude-haiku-4-5</option>
+          </select>
+        </div>
+        <div class="row">
+          <label>Passes
+            <span class="hint">Later passes re-clean leftovers</span>
+          </label>
+          <input type="number" value="2" style="max-width: 100px;" />
+        </div>
+        <div class="row">
+          <label>Whisper model</label>
+          <select>
+            <option>base.en</option>
+            <option>small.en</option>
+            <option>medium.en</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form">
+        <h3>Output</h3>
+        <div class="row">
+          <label>Save to</label>
+          <div style="display: flex; gap: 8px; max-width: 380px;">
+            <input type="text" value="~/Desktop/interview-smart.mp4" style="flex: 1;" />
+            <button class="btn">Browse…</button>
+          </div>
+        </div>
+        <div class="row">
+          <label>Quality (CRF)
+            <span class="hint">Lower = better quality, larger file</span>
+          </label>
+          <input type="number" value="18" style="max-width: 100px;" />
+        </div>
+      </div>
+
+      <div class="button-row" style="margin-top: 24px;">
+        <button class="btn primary large">Start smart cut</button>
+        <button class="btn large">Cancel</button>
+      </div>
+    </section>
+  </main>
+
+  <!-- ============================== SCREEN 3: RUNNING ============================== -->
+  <main class="screen" data-screen="running">
+    <aside>
+      <h3>Pipeline</h3>
+      <div class="step done"><div class="dot"></div><div class="label">File loaded<div class="meta">12:34</div></div></div>
+      <div class="step done"><div class="dot"></div><div class="label">Audio extracted<div class="meta">2.1s</div></div></div>
+      <div class="step done"><div class="dot"></div><div class="label">Silence detected<div class="meta">47 regions</div></div></div>
+      <div class="step active"><div class="dot"></div><div class="label">Transcribing<div class="meta">1,247 / ~1,800 words</div></div></div>
+      <div class="step"><div class="dot"></div><div class="label">Detect retakes</div></div>
+      <div class="step"><div class="dot"></div><div class="label">Review</div></div>
+      <div class="step"><div class="dot"></div><div class="label">Render</div></div>
+
+      <h3 style="margin-top: 24px;">Settings</h3>
+      <div class="settings-block">
+        <strong>Threshold:</strong> −30 dB<br>
+        <strong>Min silence:</strong> 0.6s<br>
+        <strong>Model:</strong> claude-opus-4-8<br>
+        <strong>Passes:</strong> 2<br>
+        <strong>Whisper:</strong> base.en
+      </div>
+    </aside>
+    <section class="content">
+      <h2>Processing…</h2>
+      <p class="subtitle">Running detection. You'll review proposed cuts when this finishes.</p>
+
+      <div class="banner banner-info">
+        <div class="spinner"></div>
+        <div>
+          <div style="font-weight: 500;">Transcribing audio with Whisper</div>
+          <div style="color: var(--dim); font-size: 12px; margin-top: 2px;">
+            ~69% complete · 1,247 / ~1,800 words
+          </div>
+        </div>
+        <div style="margin-left: auto;">
+          <button class="btn ghost">Cancel</button>
+        </div>
+      </div>
+
+      <div class="progress-bar" style="margin: 0 0 24px;">
+        <div style="width: 68%;"></div>
+      </div>
+
+      <div class="field-label">Activity log</div>
+      <div class="log">
+        <div><span class="dim">[12:04:31]</span> <span class="info">▸ stage</span> Probing file…</div>
+        <div><span class="dim">[12:04:31]</span> <span class="ok">✓ done</span> Duration: 12:34</div>
+        <div><span class="dim">[12:04:31]</span> <span class="info">▸ stage</span> Extracting audio…</div>
+        <div><span class="dim">[12:04:33]</span> <span class="ok">✓ done</span> Audio extracted (47.2 MB WAV)</div>
+        <div><span class="dim">[12:04:33]</span> <span class="info">▸ stage</span> Detecting silence (threshold −30 dB, min 0.6s)</div>
+        <div><span class="dim">[12:04:38]</span> <span class="ok">✓ done</span> Found 47 silence regions</div>
+        <div><span class="dim">[12:04:38]</span> <span class="info">▸ stage</span> Fine-grain silence pass for snap boundaries…</div>
+        <div><span class="dim">[12:04:42]</span> <span class="ok">✓ done</span> 312 fine silences mapped</div>
+        <div><span class="dim">[12:04:42]</span> <span class="info">▸ stage</span> Transcribing with whisper (base.en)…</div>
+        <div><span class="dim">[12:05:18]</span> <span class="dim">… 1,247 words so far</span></div>
+      </div>
+
+      <div class="field-label">What's next</div>
+      <p style="color: var(--dim); line-height: 1.7;">
+        Once transcription finishes, Claude runs 2 detection passes to find retakes and false starts. You'll then review each proposed cut one-by-one before any rendering happens.
+      </p>
+    </section>
+  </main>
+
+  <!-- ============================== SCREEN 4: REVIEW ============================== -->
+  <main class="screen" data-screen="review">
+    <aside>
+      <h3>Pipeline</h3>
+      <div class="step done"><div class="dot"></div><div class="label">File loaded</div></div>
+      <div class="step done"><div class="dot"></div><div class="label">Audio extracted</div></div>
+      <div class="step done"><div class="dot"></div><div class="label">Silence detected<div class="meta">47 regions</div></div></div>
+      <div class="step done"><div class="dot"></div><div class="label">Transcribed<div class="meta">1,842 words</div></div></div>
+      <div class="step done"><div class="dot"></div><div class="label">Retakes detected<div class="meta">12 proposals</div></div></div>
+      <div class="step active"><div class="dot"></div><div class="label">Review<div class="meta">Cut 3 of 12</div></div></div>
+      <div class="step"><div class="dot"></div><div class="label">Render</div></div>
+
+      <h3 style="margin-top: 24px;">Decisions so far</h3>
+      <div class="settings-block">
+        <strong style="color: var(--red);">Removed:</strong> 2<br>
+        <strong style="color: var(--yellow);">Kept:</strong> 0<br>
+        <strong>Pending:</strong> 9<br>
+        <span style="color: var(--dim);">Est. time saved: <strong style="color: var(--green);">7.4s</strong></span>
+      </div>
+    </aside>
+    <section class="content">
+      <h2>Review proposed cuts</h2>
+      <p class="subtitle">Listen to each cut and choose. Keyboard: <kbd>R</kbd> remove, <kbd>K</kbd> keep, <kbd>A</kbd> approve all, <kbd>Esc</kbd> cancel.</p>
+
+      <div class="cut-progress">
+        <div class="count">Cut 3 of 12</div>
+        <div class="bar"><div style="width: 25%;"></div></div>
+        <div class="count" style="color: var(--green);">2 removed</div>
+      </div>
+
+      <div class="cut-card">
+        <header>
+          <div>
+            <h3>Possible retake</h3>
+            <div style="margin-top: 6px;">
+              <span class="timestamp">02:14.320 → 02:18.180</span>
+              <span class="duration-chip" style="margin-left: 8px;">−3.86s</span>
+            </div>
+          </div>
+          <div class="confidence">
+            confidence
+            <span class="conf-bar"><div style="width: 86%;"></div></span>
+            <span style="color: var(--text); font-weight: 500;">0.86</span>
+          </div>
+        </header>
+
+        <div class="field-label">Remove this</div>
+        <div class="removed-text">
+          "so the way you'd uh, the way you'd configure this is — wait let me say that again"
+        </div>
+
+        <div class="field-label">Why</div>
+        <div class="reason">
+          False start followed by an explicit redo cue ("let me say that again"). The next sentence cleanly re-delivers the same point.
+        </div>
+
+        <div class="field-label">Result if removed</div>
+        <div class="stitched">
+          <span class="context">…walked through the setup,</span>
+          <span class="kept">the way you configure this is by editing wrangler.jsonc directly.</span>
+          <span class="context">Once that's saved…</span>
+        </div>
+
+        <div class="audio-row">
+          <button class="audio-btn">
+            <span class="play-icon">▶</span>
+            Play removed clip (3.9s)
+            <span class="audio-waveform">
+              <span style="height: 6px;"></span><span style="height: 9px;"></span><span style="height: 12px;"></span>
+              <span style="height: 8px;"></span><span style="height: 11px;"></span><span style="height: 5px;"></span>
+              <span style="height: 9px;"></span><span style="height: 12px;"></span><span style="height: 7px;"></span>
+            </span>
+          </button>
+          <button class="audio-btn">
+            <span class="play-icon" style="color: var(--accent);">▶</span>
+            Play stitched preview (4.2s)
+          </button>
+        </div>
+
+        <div class="actions">
+          <button class="btn danger">Remove section <kbd style="border-color: rgba(255,255,255,0.3); color: white;">R</kbd></button>
+          <button class="btn">Keep it <kbd>K</kbd></button>
+          <button class="btn primary">Approve all remaining <kbd style="border-color: rgba(255,255,255,0.3); color: white;">A</kbd></button>
+          <button class="btn ghost" style="margin-left: auto;">Cancel</button>
+        </div>
+      </div>
+
+      <div class="cut-card upcoming">
+        <header>
+          <div>
+            <h3 style="font-size: 14px;">Cut 4 / 12</h3>
+            <div style="margin-top: 4px;">
+              <span class="timestamp">02:45.110 → 02:47.940</span>
+              <span class="duration-chip" style="margin-left: 8px;">−2.83s</span>
+            </div>
+          </div>
+          <div class="confidence">
+            <span class="conf-bar"><div style="width: 72%;"></div></span>
+            <span>0.72</span>
+          </div>
+        </header>
+        <div style="color: var(--dim); font-size: 12px;">
+          Paraphrased retake of the "deployment" sentence.
+        </div>
+      </div>
+
+      <div class="cut-card upcoming">
+        <header>
+          <div>
+            <h3 style="font-size: 14px;">Cut 5 / 12</h3>
+            <div style="margin-top: 4px;">
+              <span class="timestamp">03:12.880 → 03:14.020</span>
+              <span class="duration-chip" style="margin-left: 8px;">−1.14s</span>
+            </div>
+          </div>
+          <div class="confidence">
+            <span class="conf-bar"><div style="width: 91%;"></div></span>
+            <span>0.91</span>
+          </div>
+        </header>
+        <div style="color: var(--dim); font-size: 12px;">
+          Filler stumble: "and so, and uh, and so the…"
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- ============================== SCREEN 5: RENDER ============================== -->
+  <main class="screen" data-screen="render">
+    <aside>
+      <h3>Pipeline</h3>
+      <div class="step done"><div class="dot"></div><div class="label">File loaded</div></div>
+      <div class="step done"><div class="dot"></div><div class="label">Audio extracted</div></div>
+      <div class="step done"><div class="dot"></div><div class="label">Silence detected<div class="meta">47 regions</div></div></div>
+      <div class="step done"><div class="dot"></div><div class="label">Transcribed</div></div>
+      <div class="step done"><div class="dot"></div><div class="label">Retakes detected</div></div>
+      <div class="step done"><div class="dot"></div><div class="label">Review complete<div class="meta">9 of 12 approved</div></div></div>
+      <div class="step active"><div class="dot"></div><div class="label">Rendering<div class="meta">68% · 23s left</div></div></div>
+
+      <h3 style="margin-top: 24px;">Plan summary</h3>
+      <div class="settings-block">
+        <strong>Silence cuts:</strong> 47<br>
+        <strong>Retake cuts:</strong> 9<br>
+        <strong>Total removed:</strong> <span style="color: var(--green);">2:14</span><br>
+        <strong>Final length:</strong> 10:20
+      </div>
+    </aside>
+    <section class="content" style="display: flex; align-items: center; justify-content: center;">
+      <div style="width: 100%; max-width: 540px;">
+        <div class="render-card">
+          <div style="font-size: 44px; margin-bottom: 8px;">⚙️</div>
+          <h2 style="margin-bottom: 6px;">Rendering with ffmpeg</h2>
+          <div style="color: var(--dim);">Concatenating 57 segments into <code>interview-smart.mp4</code></div>
+
+          <div class="progress-bar">
+            <div style="width: 68%;"></div>
+          </div>
+          <div style="color: var(--dim); font-size: 12px;">68% · ~23 seconds remaining</div>
+
+          <div class="progress-stats">
+            <div class="stat">
+              <div class="value">18,432</div>
+              <div class="label">Frames</div>
+            </div>
+            <div class="stat">
+              <div class="value">2.4×</div>
+              <div class="label">Speed</div>
+            </div>
+            <div class="stat">
+              <div class="value">62</div>
+              <div class="label">fps</div>
+            </div>
+            <div class="stat">
+              <div class="value">204 MB</div>
+              <div class="label">Output</div>
+            </div>
+          </div>
+
+          <button class="btn" style="margin-top: 24px;">Cancel render</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- ============================== SCREEN 6: DONE ============================== -->
+  <main class="screen" data-screen="done">
+    <aside>
+      <h3>Pipeline</h3>
+      <div class="step done"><div class="dot"></div><div class="label">File loaded</div></div>
+      <div class="step done"><div class="dot"></div><div class="label">Audio extracted</div></div>
+      <div class="step done"><div class="dot"></div><div class="label">Silence detected</div></div>
+      <div class="step done"><div class="dot"></div><div class="label">Transcribed</div></div>
+      <div class="step done"><div class="dot"></div><div class="label">Retakes detected</div></div>
+      <div class="step done"><div class="dot"></div><div class="label">Review complete</div></div>
+      <div class="step done"><div class="dot"></div><div class="label">Rendered<div class="meta">52s</div></div></div>
+
+      <h3 style="margin-top: 24px;">Session</h3>
+      <div class="settings-block">
+        <strong>Started:</strong> 12:04 PM<br>
+        <strong>Total time:</strong> 1m 47s<br>
+        <strong>API cost:</strong> ~$0.08<br>
+      </div>
+    </aside>
+    <section class="content" style="display: flex; align-items: center; justify-content: center;">
+      <div style="width: 100%; max-width: 540px;">
+        <div class="done-card">
+          <div class="check">✓</div>
+          <h2>Smart cut complete</h2>
+          <div style="color: var(--dim);">Saved to <code>~/Desktop/interview-smart.mp4</code></div>
+
+          <div class="summary-grid">
+            <div class="summary-tile">
+              <div class="label">Original</div>
+              <div class="value">12:34</div>
+            </div>
+            <div class="summary-tile">
+              <div class="label">Final</div>
+              <div class="value">10:20</div>
+            </div>
+            <div class="summary-tile">
+              <div class="label">Saved</div>
+              <div class="value green">2:14 (17.8%)</div>
+            </div>
+          </div>
+
+          <div style="color: var(--dim); font-size: 12px; margin: 8px 0 24px;">
+            47 silence regions removed · 9 retakes cut · 3 kept
+          </div>
+
+          <div class="button-row" style="justify-content: center;">
+            <button class="btn primary large">Reveal in Finder</button>
+            <button class="btn large">Open</button>
+            <button class="btn large">Process another</button>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+</div>
+
+<p class="footnote">SmartCut UI mockup · all 6 screens · use the switcher above to navigate</p>
+
+<script>
+  const buttons = document.querySelectorAll('.switcher button');
+  const screens = document.querySelectorAll('.screen');
+  const title = document.getElementById('window-title');
+
+  const titles = {
+    drop: 'SmartCut',
+    settings: 'SmartCut — interview.mp4',
+    running: 'SmartCut — interview.mp4 — Processing…',
+    review: 'SmartCut — interview.mp4 — Review',
+    render: 'SmartCut — interview.mp4 — Rendering',
+    done: 'SmartCut — interview.mp4 — Done'
+  };
+
+  buttons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const target = btn.dataset.target;
+      buttons.forEach(b => b.classList.toggle('active', b === btn));
+      screens.forEach(s => s.classList.toggle('active', s.dataset.screen === target));
+      title.textContent = titles[target] || 'SmartCut';
+    });
+  });
+
+  // Keyboard nav between screens
+  document.addEventListener('keydown', e => {
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+      const active = document.querySelector('.switcher button.active');
+      const list = Array.from(buttons);
+      const idx = list.indexOf(active);
+      const next = e.key === 'ArrowRight' ? (idx + 1) % list.length : (idx - 1 + list.length) % list.length;
+      list[next].click();
+    }
+  });
+</script>
+
+</body>
+</html>
