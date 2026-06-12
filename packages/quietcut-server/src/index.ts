@@ -1,5 +1,11 @@
 import * as readline from "node:readline";
 import {
+  runSmartcut,
+  type PipelineEvent,
+  type RetakeDecision,
+  type SmartcutConfig,
+} from "quietcut-core";
+import {
   parseRpcLine,
   RPC_ERROR,
   RpcDispatcher,
@@ -8,6 +14,24 @@ import {
   type RpcResponse,
 } from "./rpc.js";
 import { getMetadata } from "./metadata.js";
+
+const DEFAULT_FILLER_WORDS = new Set([
+  "um",
+  "uh",
+  "like",
+  "so",
+  "okay",
+  "ok",
+  "right",
+  "yeah",
+  "uh-huh",
+  "uhh",
+  "umm",
+  "hmm",
+  "hm",
+  "er",
+  "err",
+]);
 
 // -----------------------------------------------------------------------------
 // Wire layer: write only protocol messages to stdout, everything else to stderr.
@@ -26,9 +50,58 @@ function send(message: RpcResponse | RpcNotification): void {
   process.stdout.write(JSON.stringify(message) + "\n");
 }
 
+function sendEvent(event: PipelineEvent): void {
+  send({ jsonrpc: "2.0", method: "event", params: event });
+}
+
 // -----------------------------------------------------------------------------
-// Handlers (skeleton — full set of methods is wired in subsequent commits).
+// Job state: at most one smartcut job runs at a time.
 // -----------------------------------------------------------------------------
+
+type JobState = {
+  decisions: AsyncQueue<RetakeDecision>;
+  cancelRequested: boolean;
+  /** Resolves once the generator returns. */
+  finished: Promise<void>;
+};
+
+let activeJob: JobState | null = null;
+
+class AsyncQueue<T> {
+  private readonly items: T[] = [];
+  private readonly waiters: Array<(value: T) => void> = [];
+
+  push(item: T): void {
+    const waiter = this.waiters.shift();
+    if (waiter) waiter(item);
+    else this.items.push(item);
+  }
+
+  async take(): Promise<T> {
+    const head = this.items.shift();
+    if (head !== undefined) return head;
+    return new Promise<T>((resolve) => {
+      this.waiters.push(resolve);
+    });
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Handlers.
+// -----------------------------------------------------------------------------
+
+type StartParams = {
+  input: string;
+  options: Partial<SmartcutConfig> & {
+    output: string;
+    whisperModel?: string;
+  };
+};
+
+type DecideParams = {
+  opId: string;
+  action: "remove" | "keep" | "approveRest" | "cancel";
+};
 
 const dispatcher = new RpcDispatcher();
 
@@ -41,6 +114,142 @@ dispatcher.register("getMetadata", async (params) => {
   }
   return await getMetadata(p.path);
 });
+
+dispatcher.register("start", async (params) => {
+  if (activeJob) {
+    throw new RpcDispatchError(
+      RPC_ERROR.jobAlreadyRunning,
+      "A smartcut job is already running. Send `cancel` first."
+    );
+  }
+
+  const p = params as StartParams | undefined;
+  if (!p?.input || !p.options?.output) {
+    throw new RpcDispatchError(
+      RPC_ERROR.invalidParams,
+      "start requires { input, options.output }"
+    );
+  }
+
+  const config = buildConfig(p.input, p.options);
+  const whisperModel = p.options.whisperModel ?? "base.en";
+
+  activeJob = startJob(config, whisperModel);
+
+  // Resolve `start` immediately; events flow as notifications.
+  return { jobId: "current" };
+});
+
+dispatcher.register("decide", async (params) => {
+  if (!activeJob) {
+    throw new RpcDispatchError(
+      RPC_ERROR.jobNotRunning,
+      "No smartcut job is running"
+    );
+  }
+  const p = params as DecideParams | undefined;
+  if (!p?.opId || !p.action) {
+    throw new RpcDispatchError(
+      RPC_ERROR.invalidParams,
+      "decide requires { opId, action }"
+    );
+  }
+
+  activeJob.decisions.push(mapAction(p.action));
+  return { ok: true };
+});
+
+dispatcher.register("cancel", async () => {
+  if (!activeJob) return { ok: true, wasRunning: false };
+  activeJob.cancelRequested = true;
+  activeJob.decisions.push({ kind: "cancel" });
+  return { ok: true, wasRunning: true };
+});
+
+function mapAction(action: DecideParams["action"]): RetakeDecision {
+  switch (action) {
+    case "remove":
+      return { kind: "remove" };
+    case "keep":
+      return { kind: "keep" };
+    case "approveRest":
+      return { kind: "approveRest" };
+    case "cancel":
+      return { kind: "cancel" };
+  }
+}
+
+function buildConfig(
+  input: string,
+  options: StartParams["options"]
+): SmartcutConfig {
+  return {
+    input,
+    output: options.output,
+    thresholdDb: options.thresholdDb ?? -30,
+    minSilence: options.minSilence ?? 0.6,
+    model: options.model ?? "claude-opus-4-8",
+    fillerWords: options.fillerWords ?? DEFAULT_FILLER_WORDS,
+    maxRetakeRatio: options.maxRetakeRatio ?? 15,
+    passes: options.passes ?? 2,
+    transcriptPath: options.transcriptPath,
+    saveTranscriptPath: options.saveTranscriptPath,
+    planPath: options.planPath,
+    savePlanPath: options.savePlanPath,
+    leadInMs: options.leadInMs ?? 300,
+    tailOutMs: options.tailOutMs ?? 300,
+    skipApproval: options.skipApproval ?? false,
+    dryRun: options.dryRun ?? false,
+    crf: options.crf ?? 18,
+    preset: options.preset ?? "medium",
+  };
+}
+
+// -----------------------------------------------------------------------------
+// Job runner.
+// -----------------------------------------------------------------------------
+
+function startJob(config: SmartcutConfig, whisperModel: string): JobState {
+  const decisions = new AsyncQueue<RetakeDecision>();
+  const state: JobState = {
+    decisions,
+    cancelRequested: false,
+    finished: Promise.resolve(),
+  };
+
+  state.finished = (async () => {
+    const gen = runSmartcut(config, whisperModel);
+    let nextDecision: RetakeDecision | undefined;
+
+    try {
+      while (true) {
+        const { value, done } = await gen.next(nextDecision);
+        nextDecision = undefined;
+        if (done) break;
+
+        sendEvent(value);
+
+        // If the generator is waiting on a decision, block until the
+        // client sends one via `decide` (or `cancel`).
+        if (value.type === "retakeProposed") {
+          if (state.cancelRequested) {
+            nextDecision = { kind: "cancel" };
+          } else {
+            nextDecision = await decisions.take();
+          }
+        }
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      sendEvent({ type: "error", message });
+      logError(err);
+    } finally {
+      if (state === activeJob) activeJob = null;
+    }
+  })();
+
+  return state;
+}
 
 // -----------------------------------------------------------------------------
 // Stdio loop.
@@ -68,6 +277,9 @@ async function drainInFlight(): Promise<void> {
   while (inFlight.size > 0) {
     await Promise.allSettled([...inFlight]);
   }
+  if (activeJob) {
+    await activeJob.finished.catch(() => undefined);
+  }
 }
 
 function main(): void {
@@ -77,6 +289,10 @@ function main(): void {
   for (const signal of ["SIGINT", "SIGTERM"] as const) {
     process.on(signal, () => {
       logInfo(`received ${signal}, shutting down`);
+      if (activeJob) {
+        activeJob.cancelRequested = true;
+        activeJob.decisions.push({ kind: "cancel" });
+      }
       drainInFlight().finally(() => process.exit(0));
     });
   }
