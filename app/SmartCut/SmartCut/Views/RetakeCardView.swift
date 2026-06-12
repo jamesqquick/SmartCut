@@ -1,10 +1,12 @@
 import SwiftUI
 
 /// Single retake review card. Renders one proposal and exposes the four
-/// actions (remove / keep / approve all / cancel). Audio buttons are
-/// placeholders until Phase 3.6 wires AudioPlayer.
+/// actions (remove / keep / approve all / cancel) plus two audio
+/// previews backed by AudioPlayer + SidecarClient.extractClip /
+/// extractStitchedClip.
 struct RetakeCardView: View {
     @Environment(AppState.self) private var appState
+    @State private var audio = AudioPlayer()
 
     let proposal: RetakeProposal
 
@@ -26,9 +28,17 @@ struct RetakeCardView: View {
                         .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
                 )
         )
+        // When the user advances to the next proposal, stop any preview
+        // audio that's still spooling from the previous one.
+        .onChange(of: proposal.id) { _, _ in
+            audio.stop()
+        }
+        .onDisappear { audio.stop() }
     }
 
     private var op: RemoveRetakeOp { proposal.op }
+    private var removedKey: String { "removed-\(proposal.id)" }
+    private var stitchedKey: String { "stitched-\(proposal.id)" }
 
     private var header: some View {
         HStack(alignment: .firstTextBaseline) {
@@ -112,30 +122,90 @@ struct RetakeCardView: View {
     private var audioRow: some View {
         HStack(spacing: 10) {
             audioButton(
+                key: removedKey,
                 title: "Play removed clip (\(Formatters.shortDuration(op.duration)))",
-                tint: .secondary
+                tint: .secondary,
+                action: playRemovedClip
             )
-            audioButton(title: "Play stitched preview", tint: .accentColor)
+            audioButton(
+                key: stitchedKey,
+                title: "Play stitched preview",
+                tint: .accentColor,
+                action: playStitchedPreview
+            )
+            if let error = audio.errorMessage {
+                Text(error)
+                    .font(.system(size: 11))
+                    .foregroundStyle(.red)
+                    .lineLimit(1)
+            }
         }
     }
 
-    private func audioButton(title: String, tint: Color) -> some View {
-        HStack(spacing: 8) {
-            Image(systemName: "play.fill").foregroundStyle(tint)
-            Text(title).font(.system(size: 12))
+    private func audioButton(
+        key: String, title: String, tint: Color, action: @escaping () -> Void
+    ) -> some View {
+        let active = audio.currentKey == key
+        let loading = active && audio.isLoading
+        let playing = active && audio.isPlaying
+        let symbol = playing ? "pause.fill" : "play.fill"
+
+        return Button(action: action) {
+            HStack(spacing: 8) {
+                if loading {
+                    ProgressView().controlSize(.small)
+                        .progressViewStyle(.circular)
+                        .scaleEffect(0.65)
+                        .frame(width: 14, height: 14)
+                } else {
+                    Image(systemName: symbol).foregroundStyle(tint)
+                }
+                Text(title).font(.system(size: 12))
+            }
+            .padding(.vertical, 8)
+            .padding(.horizontal, 12)
+            .background(
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(Color(nsColor: .controlColor))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 6)
+                            .stroke(
+                                playing
+                                    ? Color.accentColor
+                                    : Color(nsColor: .separatorColor),
+                                lineWidth: 1)
+                    )
+            )
         }
-        .padding(.vertical, 8)
-        .padding(.horizontal, 12)
-        .background(
-            RoundedRectangle(cornerRadius: 6)
-                .fill(Color(nsColor: .controlColor))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 6)
-                        .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
-                )
-        )
-        .opacity(0.55)
-        .help("Audio preview lands in Phase 3.6")
+        .buttonStyle(.plain)
+        .disabled(loading)
+    }
+
+    private func playRemovedClip() {
+        guard let input = appState.droppedFile else { return }
+        let sidecar = appState.sidecar!
+        let removeStart = op.start
+        let removeEnd = op.end
+        audio.play(key: removedKey) {
+            let clip = try await sidecar.extractClip(
+                input: input, startSec: removeStart, endSec: removeEnd)
+            return URL(fileURLWithPath: clip.path)
+        }
+    }
+
+    private func playStitchedPreview() {
+        guard let input = appState.droppedFile else { return }
+        let sidecar = appState.sidecar!
+        let removeStart = op.start
+        let removeEnd = op.end
+        audio.play(key: stitchedKey) {
+            let clip = try await sidecar.extractStitchedClip(
+                input: input,
+                removeStart: removeStart,
+                removeEnd: removeEnd
+            )
+            return URL(fileURLWithPath: clip.path)
+        }
     }
 
     private var actionRow: some View {

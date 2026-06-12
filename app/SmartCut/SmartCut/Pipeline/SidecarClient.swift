@@ -302,6 +302,32 @@ final class SidecarClient {
             params: P(path: input.path, startSec: startSec, endSec: endSec))
     }
 
+    func extractStitchedClip(
+        input: URL,
+        removeStart: Double,
+        removeEnd: Double,
+        padSec: Double? = nil,
+        tailSec: Double? = nil
+    ) async throws -> AudioClip {
+        struct P: Encodable {
+            let path: String
+            let removeStart: Double
+            let removeEnd: Double
+            let padSec: Double?
+            let tailSec: Double?
+        }
+        return try await request(
+            method: "extractStitchedClip",
+            params: P(
+                path: input.path,
+                removeStart: removeStart,
+                removeEnd: removeEnd,
+                padSec: padSec,
+                tailSec: tailSec
+            )
+        )
+    }
+
     @discardableResult
     func start(input: URL, options: StartOptions) async throws -> String {
         struct P: Encodable {
