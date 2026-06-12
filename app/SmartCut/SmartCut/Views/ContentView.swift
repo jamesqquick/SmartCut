@@ -17,7 +17,7 @@ struct ContentView: View {
             case .review:
                 RetakeReviewView()
             case .render:
-                ScreenPlaceholder(title: "Rendering", screen: .render)
+                RenderProgressView()
             case .done:
                 ScreenPlaceholder(title: "Smart cut complete", screen: .done)
             }
