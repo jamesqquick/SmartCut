@@ -14,6 +14,7 @@ import {
   type RpcResponse,
 } from "./rpc.js";
 import { getMetadata } from "./metadata.js";
+import { extractClip } from "./audio-preview.js";
 
 const DEFAULT_FILLER_WORDS = new Set([
   "um",
@@ -103,6 +104,12 @@ type DecideParams = {
   action: "remove" | "keep" | "approveRest" | "cancel";
 };
 
+type ExtractClipParams = {
+  path: string;
+  startSec: number;
+  endSec: number;
+};
+
 const dispatcher = new RpcDispatcher();
 
 dispatcher.register("ping", async () => ({ pong: true }));
@@ -113,6 +120,17 @@ dispatcher.register("getMetadata", async (params) => {
     throw new RpcDispatchError(RPC_ERROR.invalidParams, "missing params.path");
   }
   return await getMetadata(p.path);
+});
+
+dispatcher.register("extractClip", async (params) => {
+  const p = params as ExtractClipParams | undefined;
+  if (!p?.path || typeof p.startSec !== "number" || typeof p.endSec !== "number") {
+    throw new RpcDispatchError(
+      RPC_ERROR.invalidParams,
+      "extractClip requires { path, startSec, endSec }"
+    );
+  }
+  return await extractClip(p.path, p.startSec, p.endSec);
 });
 
 dispatcher.register("start", async (params) => {
