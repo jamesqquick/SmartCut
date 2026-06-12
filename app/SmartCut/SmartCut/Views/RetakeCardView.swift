@@ -210,32 +210,64 @@ struct RetakeCardView: View {
 
     private var actionRow: some View {
         HStack(spacing: 10) {
-            Button { Task { await appState.decide(.remove) } } label: {
-                Label("Remove section", systemImage: "scissors")
-                    .padding(.horizontal, 6)
+            HStack(spacing: 6) {
+                Button { Task { await appState.decide(.remove) } } label: {
+                    Label("Remove section", systemImage: "scissors")
+                        .padding(.horizontal, 6)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(.red)
+                .controlSize(.large)
+                .keyboardShortcut("r", modifiers: [])
+                KeyBadge("R")
             }
-            .buttonStyle(.borderedProminent)
-            .tint(.red)
-            .controlSize(.large)
 
-            Button { Task { await appState.decide(.keep) } } label: {
-                Label("Keep it", systemImage: "checkmark")
-                    .padding(.horizontal, 6)
+            HStack(spacing: 6) {
+                Button { Task { await appState.decide(.keep) } } label: {
+                    Label("Keep it", systemImage: "checkmark")
+                        .padding(.horizontal, 6)
+                }
+                .controlSize(.large)
+                .keyboardShortcut("k", modifiers: [])
+                KeyBadge("K")
             }
-            .controlSize(.large)
 
-            Button { Task { await appState.decide(.approveRest) } } label: {
-                Label("Approve all remaining", systemImage: "checkmark.circle.fill")
-                    .padding(.horizontal, 6)
+            HStack(spacing: 6) {
+                Button { Task { await appState.decide(.approveRest) } } label: {
+                    Label("Approve all remaining", systemImage: "checkmark.circle.fill")
+                        .padding(.horizontal, 6)
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
+                .keyboardShortcut("a", modifiers: [])
+                KeyBadge("A")
             }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.large)
 
             Spacer()
 
-            Button("Cancel") { Task { await appState.cancel() } }
-                .controlSize(.large)
+            HStack(spacing: 6) {
+                Button("Cancel") { Task { await appState.cancel() } }
+                    .controlSize(.large)
+                    .keyboardShortcut(.cancelAction)
+                KeyBadge("Esc")
+            }
         }
+    }
+}
+
+private struct KeyBadge: View {
+    let key: String
+    init(_ key: String) { self.key = key }
+    var body: some View {
+        Text(key)
+            .font(.system(size: 10, weight: .medium, design: .monospaced))
+            .padding(.horizontal, 5)
+            .padding(.vertical, 1)
+            .background(
+                RoundedRectangle(cornerRadius: 3)
+                    .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
+            )
+            .foregroundStyle(.secondary)
     }
 }
 
