@@ -15,7 +15,7 @@ struct ContentView: View {
             case .running:
                 PipelineRunningView()
             case .review:
-                ScreenPlaceholder(title: "Review proposed cuts", screen: .review)
+                RetakeReviewView()
             case .render:
                 ScreenPlaceholder(title: "Rendering", screen: .render)
             case .done:

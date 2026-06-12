@@ -11,6 +11,7 @@
 		0C13BB79E4152E237862DE9B /* DropZoneView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4C1F56CACF123D035D87885 /* DropZoneView.swift */; };
 		2EB522D90A5F502AD6AA701A /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A75D4F53BB554359F277AE5 /* SettingsView.swift */; };
 		2FC4F33DC7145CBDD78B68C3 /* PipelineRunningView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CFF86949977C08C95E4A47D8 /* PipelineRunningView.swift */; };
+		37716431DE057787469FDCF1 /* RetakeReviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8BC05C466C65A6998A026B85 /* RetakeReviewView.swift */; };
 		5E8AF3036A0F3BC9BC2F21F0 /* SidecarClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = D126857A802004179B6F536B /* SidecarClient.swift */; };
 		5F298894914D2EE8B2586965 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 9E18683F0A838AC7A41E2670 /* Assets.xcassets */; };
 		6A6EE02D359544A9A0A8C8FA /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 136DE876CC6D55F5E36CB27E /* ContentView.swift */; };
@@ -18,6 +19,7 @@
 		7989E2A288206C19942015D5 /* SmartCutApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F8CC15A6C58EBE068391ECC /* SmartCutApp.swift */; };
 		8BF17833535746D3E2CE937A /* StatusPanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1DF36BBE15CC86B8D2F49BE8 /* StatusPanelView.swift */; };
 		907E792F3A55F0CE97CD1A54 /* SidecarConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B382CA30BFAE727C86B125F /* SidecarConfig.swift */; };
+		9F284730B700FA70BF170406 /* RetakeCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C368E6771004B5B50DE5ECF0 /* RetakeCardView.swift */; };
 		C5163B5DF93391F99DEAAE35 /* PipelineEvent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2673DFA94CEA52C0B8BFA6FA /* PipelineEvent.swift */; };
 		CF20AD1CB0342BD667129E7F /* Formatters.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7946DB038E18ECFB0243C6AE /* Formatters.swift */; };
 		FEDF877023DD7B0F373BFD0A /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8772A3944453991B0DEE70B8 /* AppState.swift */; };
@@ -35,7 +37,9 @@
 		7752C98F1E47175235EBD655 /* RetakeDecision.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RetakeDecision.swift; sourceTree = "<group>"; };
 		7946DB038E18ECFB0243C6AE /* Formatters.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Formatters.swift; sourceTree = "<group>"; };
 		8772A3944453991B0DEE70B8 /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
+		8BC05C466C65A6998A026B85 /* RetakeReviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RetakeReviewView.swift; sourceTree = "<group>"; };
 		9E18683F0A838AC7A41E2670 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		C368E6771004B5B50DE5ECF0 /* RetakeCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RetakeCardView.swift; sourceTree = "<group>"; };
 		CFF86949977C08C95E4A47D8 /* PipelineRunningView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PipelineRunningView.swift; sourceTree = "<group>"; };
 		D126857A802004179B6F536B /* SidecarClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidecarClient.swift; sourceTree = "<group>"; };
 		D4C1F56CACF123D035D87885 /* DropZoneView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DropZoneView.swift; sourceTree = "<group>"; };
@@ -87,6 +91,8 @@
 				136DE876CC6D55F5E36CB27E /* ContentView.swift */,
 				D4C1F56CACF123D035D87885 /* DropZoneView.swift */,
 				CFF86949977C08C95E4A47D8 /* PipelineRunningView.swift */,
+				C368E6771004B5B50DE5ECF0 /* RetakeCardView.swift */,
+				8BC05C466C65A6998A026B85 /* RetakeReviewView.swift */,
 				5A75D4F53BB554359F277AE5 /* SettingsView.swift */,
 			);
 			path = Views;
@@ -196,7 +202,9 @@
 				CF20AD1CB0342BD667129E7F /* Formatters.swift in Sources */,
 				C5163B5DF93391F99DEAAE35 /* PipelineEvent.swift in Sources */,
 				2FC4F33DC7145CBDD78B68C3 /* PipelineRunningView.swift in Sources */,
+				9F284730B700FA70BF170406 /* RetakeCardView.swift in Sources */,
 				05E8DCB1DDA4649A58AC558E /* RetakeDecision.swift in Sources */,
+				37716431DE057787469FDCF1 /* RetakeReviewView.swift in Sources */,
 				2EB522D90A5F502AD6AA701A /* SettingsView.swift in Sources */,
 				5E8AF3036A0F3BC9BC2F21F0 /* SidecarClient.swift in Sources */,
 				907E792F3A55F0CE97CD1A54 /* SidecarConfig.swift in Sources */,
