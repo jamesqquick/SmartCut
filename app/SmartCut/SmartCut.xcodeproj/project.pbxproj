@@ -21,6 +21,7 @@
 		8BF17833535746D3E2CE937A /* StatusPanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1DF36BBE15CC86B8D2F49BE8 /* StatusPanelView.swift */; };
 		907E792F3A55F0CE97CD1A54 /* SidecarConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B382CA30BFAE727C86B125F /* SidecarConfig.swift */; };
 		9F284730B700FA70BF170406 /* RetakeCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C368E6771004B5B50DE5ECF0 /* RetakeCardView.swift */; };
+		BE7335EDAFBA516903D2FBA5 /* DoneView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C86C4064CAD8EF29767A6300 /* DoneView.swift */; };
 		C5163B5DF93391F99DEAAE35 /* PipelineEvent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2673DFA94CEA52C0B8BFA6FA /* PipelineEvent.swift */; };
 		CF20AD1CB0342BD667129E7F /* Formatters.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7946DB038E18ECFB0243C6AE /* Formatters.swift */; };
 		FEDF877023DD7B0F373BFD0A /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8772A3944453991B0DEE70B8 /* AppState.swift */; };
@@ -42,6 +43,7 @@
 		9E18683F0A838AC7A41E2670 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		B47C967E3544951CD30DE48C /* RenderProgressView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RenderProgressView.swift; sourceTree = "<group>"; };
 		C368E6771004B5B50DE5ECF0 /* RetakeCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RetakeCardView.swift; sourceTree = "<group>"; };
+		C86C4064CAD8EF29767A6300 /* DoneView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DoneView.swift; sourceTree = "<group>"; };
 		CFF86949977C08C95E4A47D8 /* PipelineRunningView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PipelineRunningView.swift; sourceTree = "<group>"; };
 		D126857A802004179B6F536B /* SidecarClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidecarClient.swift; sourceTree = "<group>"; };
 		D4C1F56CACF123D035D87885 /* DropZoneView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DropZoneView.swift; sourceTree = "<group>"; };
@@ -91,6 +93,7 @@
 			children = (
 				7EFE32C091DFFD7589726D1B /* Sidebar */,
 				136DE876CC6D55F5E36CB27E /* ContentView.swift */,
+				C86C4064CAD8EF29767A6300 /* DoneView.swift */,
 				D4C1F56CACF123D035D87885 /* DropZoneView.swift */,
 				CFF86949977C08C95E4A47D8 /* PipelineRunningView.swift */,
 				B47C967E3544951CD30DE48C /* RenderProgressView.swift */,
@@ -201,6 +204,7 @@
 			files = (
 				FEDF877023DD7B0F373BFD0A /* AppState.swift in Sources */,
 				6A6EE02D359544A9A0A8C8FA /* ContentView.swift in Sources */,
+				BE7335EDAFBA516903D2FBA5 /* DoneView.swift in Sources */,
 				0C13BB79E4152E237862DE9B /* DropZoneView.swift in Sources */,
 				CF20AD1CB0342BD667129E7F /* Formatters.swift in Sources */,
 				C5163B5DF93391F99DEAAE35 /* PipelineEvent.swift in Sources */,
