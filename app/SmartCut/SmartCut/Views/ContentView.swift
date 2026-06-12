@@ -11,7 +11,7 @@ struct ContentView: View {
             case .drop:
                 DropZoneView()
             case .settings:
-                ScreenPlaceholder(title: "Review settings", screen: .settings)
+                SettingsView()
             case .running:
                 ScreenPlaceholder(title: "Processing…", screen: .running)
             case .review:
