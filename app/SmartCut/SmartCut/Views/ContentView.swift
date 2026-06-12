@@ -25,6 +25,17 @@ struct ContentView: View {
         .environment(appState)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(nsColor: .windowBackgroundColor))
+        .sheet(
+            isPresented: Binding(
+                get: { appState.needsFirstRunConfig },
+                set: { newValue in
+                    if !newValue { appState.needsFirstRunConfig = false }
+                }
+            )
+        ) {
+            FirstRunSheet(initial: appState.config)
+                .environment(appState)
+        }
     }
 }
 

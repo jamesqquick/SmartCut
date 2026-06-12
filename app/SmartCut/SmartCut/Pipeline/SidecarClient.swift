@@ -208,14 +208,16 @@ final class SidecarClient {
         p.standardOutput = stdout
         p.standardError = stderr
 
-        // Build the child env: inherit ours, prepend Homebrew paths so
-        // ffmpeg / whisper-cli resolve, then merge in extra env (.env).
+        // Build the child env: inherit ours, prepend ffmpeg/whisper dirs
+        // so shell-out commands resolve, then merge in extra env (creds).
         var env = ProcessInfo.processInfo.environment
-        let extraPaths = "/opt/homebrew/bin:/usr/local/bin"
-        if let path = env["PATH"], !path.contains(extraPaths) {
-            env["PATH"] = "\(extraPaths):\(path)"
-        } else if env["PATH"] == nil {
-            env["PATH"] = "\(extraPaths):/usr/bin:/bin"
+        let prepend = config.extraPathDirs.joined(separator: ":")
+        if !prepend.isEmpty {
+            if let path = env["PATH"], !path.isEmpty {
+                env["PATH"] = "\(prepend):\(path)"
+            } else {
+                env["PATH"] = "\(prepend):/usr/bin:/bin"
+            }
         }
         for (k, v) in config.extraEnv { env[k] = v }
         p.environment = env

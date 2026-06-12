@@ -108,15 +108,31 @@ final class AppState {
 
     var summary: DoneSummary?
 
+    // --- config + preferences ---
+
+    var config: AppConfig
+    var preferences: AppPreferences
+    /// True when the first-run sheet should be shown (missing required
+    /// secrets). Bound by `ContentView` as the sheet trigger.
+    var needsFirstRunConfig: Bool
+
     // --- dependencies ---
 
     private(set) var sidecar: SidecarClient!
 
     init() {
+        let loadedConfig = AppConfig.load()
+        let loadedPrefs = AppPreferences.load()
+        self.config = loadedConfig
+        self.preferences = loadedPrefs
+        self.needsFirstRunConfig = !loadedConfig.hasRequiredSecrets
+        self.options = loadedPrefs.makeStartOptions()
+
         // SidecarClient needs a reference back to us for event dispatch.
         // Capture-then-bind dance to avoid passing `self` before `self`
         // is fully initialized.
         self.sidecar = SidecarClient(
+            config: .from(loadedConfig),
             onEvent: { [weak self] event in
                 Task { @MainActor in self?.handle(event: event) }
             },
@@ -126,13 +142,41 @@ final class AppState {
         )
     }
 
+    /// Persist a new `AppConfig` and rebuild the sidecar so the new
+    /// node path / env reach the next spawn.
+    func saveConfig(_ newConfig: AppConfig) {
+        do {
+            try newConfig.save()
+            config = newConfig
+            needsFirstRunConfig = !newConfig.hasRequiredSecrets
+
+            // Tear down the existing sidecar so the next ensureRunning()
+            // picks up the refreshed environment.
+            sidecar.stop()
+            sidecar = SidecarClient(
+                config: .from(newConfig),
+                onEvent: { [weak self] event in
+                    Task { @MainActor in self?.handle(event: event) }
+                },
+                onExit: { [weak self] status in
+                    Task { @MainActor in self?.handleSidecarExit(status: status) }
+                }
+            )
+        } catch {
+            errorMessage = "Could not save config: \(error.localizedDescription)"
+        }
+    }
+
     // MARK: - User actions
 
     func handleDrop(_ url: URL) async {
         droppedFile = url
         metadata = nil
         errorMessage = nil
-        options.output = AppState.defaultOutputPath(for: url)
+        // Re-seed options each drop so user-tweaked previous-run state
+        // doesn't bleed into the next file.
+        options = preferences.makeStartOptions()
+        options.output = defaultOutputPath(for: url)
 
         do {
             let md = try await sidecar.getMetadata(path: url)
@@ -145,6 +189,15 @@ final class AppState {
 
     func startProcessing() async {
         guard let input = droppedFile else { return }
+
+        // Snapshot the current options into preferences so the next
+        // session picks up the user's last-used settings.
+        preferences.update(from: options)
+        if let dir = parentDir(of: options.output) {
+            preferences.outputDirectory = dir
+        }
+        try? preferences.save()
+
         resetPipelineState()
         screen = .running
         currentStage = nil
@@ -155,6 +208,12 @@ final class AppState {
             errorMessage = error.localizedDescription
             appendLog(.err, error.localizedDescription)
         }
+    }
+
+    private func parentDir(of path: String) -> String? {
+        guard !path.isEmpty else { return nil }
+        let url = URL(fileURLWithPath: path)
+        return url.deletingLastPathComponent().path
     }
 
     func decide(_ action: RetakeDecision) async {
@@ -333,8 +392,13 @@ final class AppState {
         }
     }
 
-    private static func defaultOutputPath(for input: URL) -> String {
-        let dir = input.deletingLastPathComponent()
+    private func defaultOutputPath(for input: URL) -> String {
+        let dir: URL
+        if let configured = preferences.outputDirectory, !configured.isEmpty {
+            dir = URL(fileURLWithPath: configured)
+        } else {
+            dir = input.deletingLastPathComponent()
+        }
         let stem = input.deletingPathExtension().lastPathComponent
         let ext = input.pathExtension.isEmpty ? "mp4" : input.pathExtension
         return dir.appendingPathComponent("\(stem)-smart.\(ext)").path

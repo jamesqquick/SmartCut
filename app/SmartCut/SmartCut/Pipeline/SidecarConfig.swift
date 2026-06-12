@@ -1,31 +1,63 @@
 import Foundation
 
-/// Locations the SidecarClient may need to discover at runtime.
-/// In Phase 4 these become user-settable via `~/.smartcut/config.json`.
+/// Locations the SidecarClient needs to discover at runtime.
+/// Built from a user-supplied `AppConfig` plus sensible defaults.
 struct SidecarConfig {
     var nodePath: URL
     var sidecarPath: URL
     /// Extra env vars to merge into the spawned child's environment.
-    /// Used to forward CF AI Gateway creds without requiring the user to
-    /// launch the .app from a terminal.
     var extraEnv: [String: String]
+    /// Directories prepended to PATH for ffmpeg / whisper-cli resolution.
+    var extraPathDirs: [String]
 
-    /// Default discovery — for personal-use v1. Tries common Homebrew
-    /// locations for `node`; points the sidecar at the dev workspace's
-    /// dist/server.cjs.
+    /// Build a SidecarConfig from a user-supplied AppConfig. Falls back
+    /// to discovery defaults when fields are missing.
+    static func from(_ appConfig: AppConfig) -> SidecarConfig {
+        let nodeURL =
+            appConfig.nodePath.flatMap(nonEmptyURL)
+            ?? resolveNodeBinary()
+
+        let sidecarURL =
+            appConfig.sidecarPath.flatMap(nonEmptyURL)
+            ?? URL(
+                fileURLWithPath:
+                    "/Users/jamesqquick/code/SmartCut/packages/quietcut-server/dist/server.cjs"
+            )
+
+        var paths: [String] = []
+        if let dir = appConfig.ffmpegDir, !dir.isEmpty {
+            paths.append(dir)
+        }
+        // Always include common brew prefixes as fallbacks.
+        for fallback in ["/opt/homebrew/bin", "/usr/local/bin"] where !paths.contains(fallback) {
+            paths.append(fallback)
+        }
+
+        // If config doesn't have creds, fall back to a workspace `.env`
+        // so dev workflow keeps working when config.json isn't populated.
+        var env = appConfig.processEnv
+        if env["CLOUDFLARE_ACCOUNT_ID"] == nil {
+            for (k, v) in loadDevEnv() {
+                env[k] = v
+            }
+        }
+
+        return SidecarConfig(
+            nodePath: nodeURL,
+            sidecarPath: sidecarURL,
+            extraEnv: env,
+            extraPathDirs: paths
+        )
+    }
+
+    /// Legacy convenience used by smoke tests / previews.
     static func defaults() -> SidecarConfig {
-        let node = resolveNodeBinary()
-        let sidecar = URL(
-            fileURLWithPath:
-                "/Users/jamesqquick/code/SmartCut/packages/quietcut-server/dist/server.cjs")
-        let env = loadWorkspaceEnv()
-        return SidecarConfig(nodePath: node, sidecarPath: sidecar, extraEnv: env)
+        from(.load())
     }
 
     /// Look in well-known Homebrew prefixes (apple silicon, intel) then
-    /// fall back to `/usr/bin/env node`. The fallback works at run time
-    /// only when `node` is also on the GUI's PATH, which it usually
-    /// isn't — Homebrew paths first is intentional.
+    /// fall back to `/usr/bin/env node`. The fallback only works when
+    /// `node` is on the GUI's PATH, which is rare from Finder.
     private static func resolveNodeBinary() -> URL {
         let candidates = [
             "/opt/homebrew/bin/node",
@@ -38,10 +70,9 @@ struct SidecarConfig {
     }
 
     /// Best-effort load of the workspace `.env` so the spawned sidecar
-    /// can authenticate with Cloudflare AI Gateway when the app is
-    /// launched from Finder (where env vars from a shell are absent).
-    /// Returns an empty dict if the file isn't there.
-    private static func loadWorkspaceEnv() -> [String: String] {
+    /// can authenticate when launched from a fresh install before the
+    /// user fills in `~/.smartcut/config.json`.
+    private static func loadDevEnv() -> [String: String] {
         let candidates = [
             "/Users/jamesqquick/code/SmartCut/.env",
             "/Users/jamesqquick/code/local-video-tools/.env",
@@ -63,7 +94,6 @@ struct SidecarConfig {
             let key = String(line[..<eq]).trimmingCharacters(in: .whitespaces)
             var value = String(line[line.index(after: eq)...])
                 .trimmingCharacters(in: .whitespaces)
-            // Strip wrapping quotes if present.
             if value.hasPrefix("\""), value.hasSuffix("\""), value.count >= 2 {
                 value = String(value.dropFirst().dropLast())
             }
@@ -73,4 +103,8 @@ struct SidecarConfig {
         }
         return env
     }
+}
+
+private func nonEmptyURL(_ raw: String) -> URL? {
+    raw.isEmpty ? nil : URL(fileURLWithPath: raw)
 }
