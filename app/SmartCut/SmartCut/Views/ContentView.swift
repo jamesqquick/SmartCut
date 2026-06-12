@@ -13,7 +13,7 @@ struct ContentView: View {
             case .settings:
                 SettingsView()
             case .running:
-                ScreenPlaceholder(title: "Processing…", screen: .running)
+                PipelineRunningView()
             case .review:
                 ScreenPlaceholder(title: "Review proposed cuts", screen: .review)
             case .render:
