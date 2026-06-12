@@ -9,6 +9,7 @@ import { warnIfUnsupportedContainer } from "../utils/paths.js";
 import { detectSilences } from "../detect.js";
 import { summarize } from "../segments.js";
 import { render } from "../render.js";
+import { formatDuration } from "../utils/time.js";
 import {
   loadTokensFromTranscript,
   transcribeFromAudio,
@@ -123,7 +124,7 @@ export async function* runSmartcut(
       durationSec: duration,
       sizeBytes,
     };
-    yield stageDone("probe", `Duration: ${duration.toFixed(2)}s`);
+    yield stageDone("probe", `Duration: ${formatDuration(duration)}`);
   } catch (err) {
     yield stageFail("probe", "Could not read file duration.");
     yield {

@@ -2,32 +2,14 @@ import Table from "cli-table3";
 import chalk from "chalk";
 import path from "node:path";
 import {
+  formatDuration,
+  formatTime,
   retakeOps,
   type EditPlan,
   type Segment,
 } from "quietcut-core";
 
-// --- time formatters (mirror packages/quietcut-core/src/utils/time.ts) -----
-
-export function formatTime(seconds: number): string {
-  const totalMs = Math.round(seconds * 1000);
-  const hours = Math.floor(totalMs / 3_600_000);
-  const minutes = Math.floor((totalMs % 3_600_000) / 60_000);
-  const secs = Math.floor((totalMs % 60_000) / 1000);
-  const ms = totalMs % 1000;
-  const hms = `${String(hours).padStart(2, "0")}:${String(minutes).padStart(
-    2,
-    "0"
-  )}:${String(secs).padStart(2, "0")}.${String(ms).padStart(3, "0")}`;
-  return hms;
-}
-
-export function formatDuration(seconds: number): string {
-  if (seconds < 60) return `${seconds.toFixed(1)}s`;
-  const m = Math.floor(seconds / 60);
-  const s = (seconds - m * 60).toFixed(1);
-  return `${m}m ${s}s`;
-}
+export { formatDuration, formatTime };
 
 // --- summary -----------------------------------------------------------------
 

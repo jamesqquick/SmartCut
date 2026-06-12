@@ -212,9 +212,15 @@ export const smartcutCommand = new Command("smartcut")
     ): Promise<RetakeDecision | void> {
       switch (event.type) {
         case "stage": {
+          // Legacy CLI was silent about the fine-grained snap-silence step;
+          // preserve that to keep terminal output equivalent.
+          if (event.stage === "silence-fine") return;
+
           const label = STAGE_LABELS[event.stage] ?? event.stage;
           if (event.status === "start") {
-            ensureSpinner(event.stage, `${label}...`);
+            // Prefer the generator's per-stage message (e.g. "Transcribing
+            // with whisper (model: base.en)...") to keep parity with legacy.
+            ensureSpinner(event.stage, event.message ?? `${label}...`);
           } else if (event.status === "done") {
             finishSpinner(event.stage, "succeed", event.message ?? `${label} done.`);
           } else {
