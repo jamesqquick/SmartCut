@@ -9,7 +9,7 @@ struct ContentView: View {
         Group {
             switch appState.screen {
             case .drop:
-                ScreenPlaceholder(title: "Drop a video here", screen: .drop)
+                DropZoneView()
             case .settings:
                 ScreenPlaceholder(title: "Review settings", screen: .settings)
             case .running:
