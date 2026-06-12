@@ -106,6 +106,29 @@ The output file lives at `$TMPDIR/smartcut-previews/clip-<uuid>.wav`. It
 is automatically unlinked 5 minutes after creation (`setTimeout` with
 `.unref()`).
 
+### `extractStitchedClip`
+
+Render a "stitched preview" — the audio that would result if a proposed
+retake cut were applied. Used by the retake review card's `Play
+stitched preview` button.
+
+- Params:
+  ```jsonc
+  {
+    "path": string,        // input media file
+    "removeStart": number, // seconds, start of the cut
+    "removeEnd": number,   // seconds, end of the cut
+    "padSec": number?,     // seconds of context BEFORE the cut (default 1.5)
+    "tailSec": number?     // seconds AFTER the cut (default 4.0)
+  }
+  ```
+- Returns: `{ "path": string, "durationSec": number }`
+- Errors: `invalidParams` (`removeEnd <= removeStart`), `internalError`
+  (ffmpeg failure).
+
+Output file lives at `$TMPDIR/smartcut-previews/stitched-<uuid>.wav` and
+uses the same 5-minute TTL as `extractClip`.
+
 ### `start`
 
 Begin a smartcut run. Resolves **immediately** with an opaque job

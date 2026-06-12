@@ -14,7 +14,7 @@ import {
   type RpcResponse,
 } from "./rpc.js";
 import { getMetadata } from "./metadata.js";
-import { extractClip } from "./audio-preview.js";
+import { extractClip, extractStitchedClip } from "./audio-preview.js";
 
 const DEFAULT_FILLER_WORDS = new Set([
   "um",
@@ -110,6 +110,14 @@ type ExtractClipParams = {
   endSec: number;
 };
 
+type ExtractStitchedClipParams = {
+  path: string;
+  removeStart: number;
+  removeEnd: number;
+  padSec?: number;
+  tailSec?: number;
+};
+
 const dispatcher = new RpcDispatcher();
 
 dispatcher.register("ping", async () => ({ pong: true }));
@@ -131,6 +139,24 @@ dispatcher.register("extractClip", async (params) => {
     );
   }
   return await extractClip(p.path, p.startSec, p.endSec);
+});
+
+dispatcher.register("extractStitchedClip", async (params) => {
+  const p = params as ExtractStitchedClipParams | undefined;
+  if (
+    !p?.path ||
+    typeof p.removeStart !== "number" ||
+    typeof p.removeEnd !== "number"
+  ) {
+    throw new RpcDispatchError(
+      RPC_ERROR.invalidParams,
+      "extractStitchedClip requires { path, removeStart, removeEnd }"
+    );
+  }
+  return await extractStitchedClip(p.path, p.removeStart, p.removeEnd, {
+    padSec: p.padSec,
+    tailSec: p.tailSec,
+  });
 });
 
 dispatcher.register("start", async (params) => {
