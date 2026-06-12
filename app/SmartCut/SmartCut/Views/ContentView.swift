@@ -6,22 +6,17 @@ struct ContentView: View {
     @State private var appState = AppState()
 
     var body: some View {
-        Group {
-            switch appState.screen {
-            case .drop:
-                DropZoneView()
-            case .settings:
-                SettingsView()
-            case .running:
-                PipelineRunningView()
-            case .review:
-                RetakeReviewView()
-            case .render:
-                RenderProgressView()
-            case .done:
-                DoneView()
+        ZStack(alignment: .top) {
+            screen
+            if let message = appState.errorMessage {
+                ErrorBanner(message: message)
+                    .transition(
+                        .move(edge: .top).combined(with: .opacity)
+                    )
+                    .zIndex(1)
             }
         }
+        .animation(.easeInOut(duration: 0.18), value: appState.errorMessage)
         .environment(appState)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(nsColor: .windowBackgroundColor))
@@ -35,6 +30,24 @@ struct ContentView: View {
         ) {
             FirstRunSheet(initial: appState.config)
                 .environment(appState)
+        }
+    }
+
+    @ViewBuilder
+    private var screen: some View {
+        switch appState.screen {
+        case .drop:
+            DropZoneView()
+        case .settings:
+            SettingsView()
+        case .running:
+            PipelineRunningView()
+        case .review:
+            RetakeReviewView()
+        case .render:
+            RenderProgressView()
+        case .done:
+            DoneView()
         }
     }
 }

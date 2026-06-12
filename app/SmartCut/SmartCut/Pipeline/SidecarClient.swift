@@ -172,6 +172,11 @@ final class SidecarClient {
         self.onExit = onExit
     }
 
+    /// Last ~64 KB of stderr from the sidecar. Useful for surfacing
+    /// context after an unexpected exit. Read by AppState when building
+    /// the error banner.
+    var stderrSnapshot: String { stderrTail }
+
     deinit {
         // Best-effort termination without hopping to MainActor; the process
         // is owned by self so this only runs after MainActor releases it.

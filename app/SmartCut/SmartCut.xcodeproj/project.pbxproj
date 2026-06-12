@@ -25,6 +25,7 @@
 		9F284730B700FA70BF170406 /* RetakeCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C368E6771004B5B50DE5ECF0 /* RetakeCardView.swift */; };
 		BE7335EDAFBA516903D2FBA5 /* DoneView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C86C4064CAD8EF29767A6300 /* DoneView.swift */; };
 		C5163B5DF93391F99DEAAE35 /* PipelineEvent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2673DFA94CEA52C0B8BFA6FA /* PipelineEvent.swift */; };
+		CAA2A0620855D18F79DAD56B /* ErrorBanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB19F2AE3CA1D9BF1F7D652C /* ErrorBanner.swift */; };
 		CF20AD1CB0342BD667129E7F /* Formatters.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7946DB038E18ECFB0243C6AE /* Formatters.swift */; };
 		E26EDA875AC956D1CE0C10B6 /* AppPreferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C11BC5630DD31A257F5DCE2 /* AppPreferences.swift */; };
 		E4D130549D1F93776A410906 /* AppConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = E915790035615ADA9D8CAF25 /* AppConfig.swift */; };
@@ -55,6 +56,7 @@
 		D126857A802004179B6F536B /* SidecarClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidecarClient.swift; sourceTree = "<group>"; };
 		D4C1F56CACF123D035D87885 /* DropZoneView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DropZoneView.swift; sourceTree = "<group>"; };
 		E915790035615ADA9D8CAF25 /* AppConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppConfig.swift; sourceTree = "<group>"; };
+		FB19F2AE3CA1D9BF1F7D652C /* ErrorBanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ErrorBanner.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -103,6 +105,7 @@
 				136DE876CC6D55F5E36CB27E /* ContentView.swift */,
 				C86C4064CAD8EF29767A6300 /* DoneView.swift */,
 				D4C1F56CACF123D035D87885 /* DropZoneView.swift */,
+				FB19F2AE3CA1D9BF1F7D652C /* ErrorBanner.swift */,
 				A3AD1DEEEFF2A71922099C7D /* FirstRunSheet.swift */,
 				CFF86949977C08C95E4A47D8 /* PipelineRunningView.swift */,
 				B47C967E3544951CD30DE48C /* RenderProgressView.swift */,
@@ -221,6 +224,7 @@
 				6A6EE02D359544A9A0A8C8FA /* ContentView.swift in Sources */,
 				BE7335EDAFBA516903D2FBA5 /* DoneView.swift in Sources */,
 				0C13BB79E4152E237862DE9B /* DropZoneView.swift in Sources */,
+				CAA2A0620855D18F79DAD56B /* ErrorBanner.swift in Sources */,
 				3F84C676F28DDAC8D65292E9 /* FirstRunSheet.swift in Sources */,
 				CF20AD1CB0342BD667129E7F /* Formatters.swift in Sources */,
 				C5163B5DF93391F99DEAAE35 /* PipelineEvent.swift in Sources */,

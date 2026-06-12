@@ -149,22 +149,36 @@ final class AppState {
             try newConfig.save()
             config = newConfig
             needsFirstRunConfig = !newConfig.hasRequiredSecrets
-
-            // Tear down the existing sidecar so the next ensureRunning()
-            // picks up the refreshed environment.
-            sidecar.stop()
-            sidecar = SidecarClient(
-                config: .from(newConfig),
-                onEvent: { [weak self] event in
-                    Task { @MainActor in self?.handle(event: event) }
-                },
-                onExit: { [weak self] status in
-                    Task { @MainActor in self?.handleSidecarExit(status: status) }
-                }
-            )
+            rebuildSidecar()
         } catch {
             errorMessage = "Could not save config: \(error.localizedDescription)"
         }
+    }
+
+    /// Tear down and recreate the SidecarClient. Called by the error
+    /// banner's "Restart sidecar" button.
+    func restartSidecar() {
+        rebuildSidecar()
+        errorMessage = nil
+        appendLog(.info, "Sidecar restarted")
+    }
+
+    /// Dismiss the current error banner without restarting.
+    func dismissError() {
+        errorMessage = nil
+    }
+
+    private func rebuildSidecar() {
+        sidecar.stop()
+        sidecar = SidecarClient(
+            config: .from(config),
+            onEvent: { [weak self] event in
+                Task { @MainActor in self?.handle(event: event) }
+            },
+            onExit: { [weak self] status in
+                Task { @MainActor in self?.handleSidecarExit(status: status) }
+            }
+        )
     }
 
     // MARK: - User actions
@@ -363,11 +377,27 @@ final class AppState {
     }
 
     private func handleSidecarExit(status: Int32) {
-        if status != 0 && summary == nil {
-            errorMessage = "Sidecar exited unexpectedly (status \(status))."
-            appendLog(.err, errorMessage!)
-        }
+        guard status != 0 && summary == nil else { return }
+        let tail = sidecar.stderrSnapshot
+        let lastLine = tail
+            .split(separator: "\n")
+            .last(where: { !$0.trimmingCharacters(in: .whitespaces).isEmpty })
+            .map(String.init) ?? ""
+        let detail = lastLine.isEmpty ? "" : " — \(lastLine)"
+        errorMessage = "Sidecar exited unexpectedly (status \(status))\(detail)"
+        appendLog(.err, errorMessage ?? "Sidecar exited")
     }
+
+    // MARK: - Convenience for the error banner
+
+    /// Last N activity log lines, newest first. Used by the banner's
+    /// "Show details" expander.
+    func recentLogLines(limit: Int = 20) -> [LogLine] {
+        Array(activityLog.suffix(limit).reversed())
+    }
+
+    /// Snapshot of the sidecar's stderr tail for the banner.
+    var sidecarStderrSnapshot: String { sidecar?.stderrSnapshot ?? "" }
 
     // MARK: - Helpers
 
