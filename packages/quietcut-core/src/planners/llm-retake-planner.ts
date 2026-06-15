@@ -1,5 +1,4 @@
 import type Anthropic from "@anthropic-ai/sdk";
-import chalk from "chalk";
 import { detectRetakesLLM } from "../llm/detect-retakes-llm.js";
 import { snapRetakeCutRegion } from "../retake/snap.js";
 import type { Token, Segment } from "../types.js";
@@ -87,9 +86,7 @@ export async function planLlmRetakeOps(
 
   if (passesRun > 1) {
     console.log(
-      chalk.dim(
-        `Retake detection ran ${passesRun} passes; ${allOps.length} total cut(s).`
-      )
+      `Retake detection ran ${passesRun} passes; ${allOps.length} total cut(s).`
     );
   }
 

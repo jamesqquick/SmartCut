@@ -1,5 +1,4 @@
 import type Anthropic from "@anthropic-ai/sdk";
-import chalk from "chalk";
 import type { Token, Segment } from "../types.js";
 import { normalizeWord } from "../retake/transcribe.js";
 import {
@@ -348,11 +347,9 @@ export async function detectRetakesLLM(
   const { cuts, dropped } = sanitizeRetakeCuts(rawCuts, tokens.length);
   if (dropped.length > 0) {
     console.warn(
-      chalk.yellow(
-        `Note: dropped ${dropped.length} invalid retake cut(s) the model returned:`
-      )
+      `Note: dropped ${dropped.length} invalid retake cut(s) the model returned:`
     );
-    for (const d of dropped) console.warn(chalk.dim(`  - ${d.reason}`));
+    for (const d of dropped) console.warn(`  - ${d.reason}`);
   }
 
   const retakes: LlmRetake[] = [];
@@ -421,16 +418,12 @@ export async function detectRetakesLLM(
 
   if (overlongDropped > 0) {
     console.warn(
-      chalk.yellow(
-        `Note: dropped ${overlongDropped} cut(s) with an implausible delete-to-keep ratio (> ${maxRetakeRatio}:1) — likely a mis-paired recurring phrase or a looping transcript. Raise --max-retake-ratio to keep them.`
-      )
+      `Note: dropped ${overlongDropped} cut(s) with an implausible delete-to-keep ratio (> ${maxRetakeRatio}:1) — likely a mis-paired recurring phrase or a looping transcript. Raise --max-retake-ratio to keep them.`
     );
   }
   if (sparseDropped > 0) {
     console.warn(
-      chalk.yellow(
-        `Note: dropped ${sparseDropped} cut(s) spanning several seconds with almost no words — likely audio whisper couldn't transcribe, not a retake. Left in place to avoid deleting real content.`
-      )
+      `Note: dropped ${sparseDropped} cut(s) spanning several seconds with almost no words — likely audio whisper couldn't transcribe, not a retake. Left in place to avoid deleting real content.`
     );
   }
 

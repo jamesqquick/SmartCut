@@ -1,5 +1,4 @@
 import { execa } from "execa";
-import chalk from "chalk";
 import { readFile, writeFile, mkdtemp, rm } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
@@ -111,14 +110,10 @@ function warnOnCollapsedRuns(collapsed: CollapsedRun[]): void {
   if (collapsed.length === 0) return;
   const biggest = [...collapsed].sort((a, b) => b.count - a.count)[0];
   console.warn(
-    chalk.yellow(
-      `Note: transcript contained ${collapsed.length} repeated-line loop(s) — likely a whisper mis-transcription, not real speech. Collapsed them.`
-    )
+    `Note: transcript contained ${collapsed.length} repeated-line loop(s) — likely a whisper mis-transcription, not real speech. Collapsed them.`
   );
   console.warn(
-    chalk.dim(
-      `  Largest: "${biggest.text}" ×${biggest.count} (${formatTime(biggest.fromSec)}–${formatTime(biggest.toSec)}). Try a larger --whisper-model (e.g. large-v3) for that section.`
-    )
+    `  Largest: "${biggest.text}" ×${biggest.count} (${formatTime(biggest.fromSec)}–${formatTime(biggest.toSec)}). Try a larger --whisper-model (e.g. large-v3) for that section.`
   );
 }
 
