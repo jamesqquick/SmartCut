@@ -1,15 +1,20 @@
+import AppKit
 import SwiftUI
 
 /// Batch transcript review: shows the entire transcript with every AI-suggested
 /// retake cut highlighted over the words. The user can resize any cut by
 /// dragging its word-level handles (or with arrow keys), toggle cuts on/off,
-/// then apply all changes at once.
+/// create new cuts by selecting words (click then Shift-click), then apply all
+/// changes at once.
 struct TranscriptReviewView: View {
     @Environment(AppState.self) private var appState
     @Environment(\.colorScheme) private var colorScheme
 
     /// The cut currently being edited (its handles are shown + draggable).
     @State private var activeCutId: String?
+    /// Anchor word of an in-progress manual selection: set by a plain click on a
+    /// free word, consumed by a Shift-click that creates the cut.
+    @State private var selectionAnchor: Int?
     /// Frame of each transcript word in the "tx" coordinate space, for handle
     /// placement and drag hit-testing.
     @State private var wordFrames: [Int: CGRect] = [:]
@@ -115,7 +120,7 @@ struct TranscriptReviewView: View {
         if appState.reviewCuts.isEmpty {
             return "Only silence cuts will be applied. Render the result?"
         }
-        return "Select a cut, then drag its handles (or use ← →, ⌥← ⌥→) to change which words are removed. Toggle a cut off to keep that take."
+        return "Click a word then Shift-click another to cut that range. Select a cut to drag its handles (or use ← →, ⌥← ⌥→). Toggle a cut off to keep that take, or delete a manual cut with ×."
     }
 
     private var applyLabel: String {
@@ -143,11 +148,24 @@ struct TranscriptReviewView: View {
             transcriptFocused = true
         } label: {
             VStack(alignment: .leading, spacing: 6) {
-                HStack(spacing: 8) {
+                HStack(spacing: 6) {
                     Text("Cut \(index + 1)")
                         .font(.system(size: 12, weight: .semibold))
                         .foregroundStyle(cut.enabled ? Theme.ink : Theme.muted)
-                    Spacer(minLength: 12)
+                    Spacer(minLength: 8)
+                    if cut.source == .manual {
+                        Button {
+                            deleteCut(cut.opId)
+                        } label: {
+                            Image(systemName: "xmark")
+                                .font(.system(size: 9, weight: .bold))
+                                .foregroundStyle(Theme.muted)
+                                .frame(width: 16, height: 16)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .help("Delete this cut")
+                    }
                     Toggle(
                         "",
                         isOn: Binding(
@@ -159,9 +177,7 @@ struct TranscriptReviewView: View {
                     .toggleStyle(.switch)
                     .controlSize(.mini)
                 }
-                Text("\(Int(cut.op.confidence))% confidence")
-                    .font(.system(size: 10))
-                    .foregroundStyle(Theme.muted)
+                cutSourceLabel(cut)
                 Text(Formatters.shortDuration(appState.estimatedDuration(cut)) + " removed")
                     .font(.system(size: 10, weight: .medium))
                     .foregroundStyle(cut.enabled ? Theme.danger : Theme.muted)
@@ -178,6 +194,33 @@ struct TranscriptReviewView: View {
             )
         }
         .buttonStyle(.plain)
+    }
+
+    /// Second line of a cut chip: a "Manual" tag for user-created cuts, or the
+    /// AI confidence for suggested cuts.
+    @ViewBuilder
+    private func cutSourceLabel(_ cut: ReviewCutState) -> some View {
+        if cut.source == .manual {
+            Text("Manual")
+                .font(.system(size: 9, weight: .semibold))
+                .tracking(0.4)
+                .foregroundStyle(Theme.indigo)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 2)
+                .background(
+                    Capsule().fill(Theme.wash)
+                )
+        } else if let op = cut.op {
+            Text("\(Int(op.confidence))% confidence")
+                .font(.system(size: 10))
+                .foregroundStyle(Theme.muted)
+        }
+    }
+
+    /// Delete a cut and clear the active selection if it pointed at that cut.
+    private func deleteCut(_ opId: String) {
+        appState.deleteCut(opId)
+        if activeCutId == opId { activeCutId = appState.reviewCuts.first?.opId }
     }
 
     // MARK: - Transcript
@@ -216,6 +259,7 @@ struct TranscriptReviewView: View {
         let cut = cutContaining(i)
         let inCut = cut != nil
         let isActive = cut?.opId == activeCutId && inCut
+        let isAnchor = selectionAnchor == i && !inCut
 
         Text(token.word)
             .font(.system(size: 15))
@@ -225,7 +269,11 @@ struct TranscriptReviewView: View {
             .padding(.vertical, 1)
             .background(
                 RoundedRectangle(cornerRadius: Theme.radiusSmall)
-                    .fill(inCut ? Theme.danger.opacity(isActive ? 0.20 : 0.10) : .clear)
+                    .fill(wordFill(inCut: inCut, isActive: isActive, isAnchor: isAnchor))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: Theme.radiusSmall)
+                    .stroke(isAnchor ? Theme.indigo : Color.clear, lineWidth: 1)
             )
             .background(
                 GeometryReader { g in
@@ -236,10 +284,39 @@ struct TranscriptReviewView: View {
                 }
             )
             .contentShape(Rectangle())
-            .onTapGesture {
-                if let cut { activeCutId = cut.opId }
-                transcriptFocused = true
+            .onTapGesture { handleWordTap(i) }
+    }
+
+    private func wordFill(inCut: Bool, isActive: Bool, isAnchor: Bool) -> Color {
+        if inCut { return Theme.danger.opacity(isActive ? 0.20 : 0.10) }
+        if isAnchor { return Theme.wash }
+        return .clear
+    }
+
+    /// Handle a tap on transcript word `i`.
+    ///
+    /// - Shift-click creates a manual cut from the anchored word (or this word
+    ///   if no anchor) through this word, then makes it active.
+    /// - A plain click on a word inside a cut selects that cut for editing.
+    /// - A plain click on a free word anchors the start of a new selection.
+    private func handleWordTap(_ i: Int) {
+        transcriptFocused = true
+
+        if NSEvent.modifierFlags.contains(.shift) {
+            let start = selectionAnchor ?? i
+            if let id = appState.createManualCut(from: start, to: i) {
+                activeCutId = id
             }
+            selectionAnchor = nil
+            return
+        }
+
+        if let cut = cutContaining(i) {
+            activeCutId = cut.opId
+            selectionAnchor = nil
+        } else {
+            selectionAnchor = i
+        }
     }
 
     // MARK: - Handles
