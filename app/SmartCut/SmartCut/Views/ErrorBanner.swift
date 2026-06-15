@@ -14,13 +14,14 @@ struct ErrorBanner: View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .top, spacing: 12) {
                 Image(systemName: "exclamationmark.triangle.fill")
-                    .foregroundStyle(.red)
+                    .foregroundStyle(Theme.danger)
                     .font(.system(size: 16))
                     .padding(.top, 2)
 
                 VStack(alignment: .leading, spacing: 6) {
                     Text(message)
                         .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(Theme.ink)
                         .fixedSize(horizontal: false, vertical: true)
 
                     HStack(spacing: 12) {
@@ -29,7 +30,7 @@ struct ErrorBanner: View {
                         }
                         .buttonStyle(.plain)
                         .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.muted)
 
                         Button("Restart sidecar") {
                             appState.restartSidecar()
@@ -56,11 +57,11 @@ struct ErrorBanner: View {
             }
         }
         .background(
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .fill(Color.red.opacity(0.10))
+            RoundedRectangle(cornerRadius: Theme.radius, style: .continuous)
+                .fill(Theme.danger.opacity(0.10))
                 .overlay(
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .stroke(Color.red.opacity(0.35), lineWidth: 1)
+                    RoundedRectangle(cornerRadius: Theme.radius, style: .continuous)
+                        .stroke(Theme.danger.opacity(0.35), lineWidth: 1)
                 )
         )
         .padding(.horizontal, 12)
@@ -100,18 +101,18 @@ struct ErrorBanner: View {
 
     private func sectionTitle(_ s: String) -> some View {
         Text(s)
-            .font(.system(size: 9, weight: .semibold))
-            .tracking(0.6)
-            .foregroundStyle(.secondary)
+            .font(.system(size: 9, weight: .regular))
+            .tracking(0.8)
+            .foregroundStyle(Theme.muted)
     }
 
     private func color(for level: LogLine.Level) -> Color {
         switch level {
-        case .info: return Color.accentColor
-        case .ok: return .green
-        case .warn: return .yellow
-        case .err: return .red
-        case .dim: return .secondary
+        case .info: return Theme.indigo
+        case .ok: return Theme.good
+        case .warn: return Theme.warn
+        case .err: return Theme.danger
+        case .dim: return Theme.tertiary
         }
     }
 }

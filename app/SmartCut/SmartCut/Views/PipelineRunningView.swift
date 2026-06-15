@@ -2,6 +2,7 @@ import SwiftUI
 
 struct PipelineRunningView: View {
     @Environment(AppState.self) private var appState
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         AppShell {
@@ -29,9 +30,9 @@ struct PipelineRunningView: View {
 
     private func settingsRow(_ label: String, _ value: String) -> some View {
         HStack {
-            Text(label).font(.system(size: 11)).foregroundStyle(.secondary)
+            Text(label).font(.system(size: 11)).foregroundStyle(Theme.muted)
             Spacer(minLength: 6)
-            Text(value).font(.system(size: 11))
+            Text(value).font(.system(size: 11)).foregroundStyle(Theme.ink)
         }
         .padding(.vertical, 2)
         .padding(.horizontal, 10)
@@ -54,11 +55,17 @@ struct PipelineRunningView: View {
     }
 
     private var header: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text("Processing…").font(.system(size: 22, weight: .semibold))
+        VStack(alignment: .leading, spacing: 6) {
+            Text("IN PROGRESS")
+                .font(.system(size: 10, weight: .regular))
+                .tracking(0.8)
+                .foregroundStyle(Theme.muted)
+            Text("Processing")
+                .font(.system(size: 28, weight: .light))
+                .gradientTitle(colorScheme)
             Text("Running detection. You'll review proposed cuts when this finishes.")
                 .font(.system(size: 12))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Theme.bodyText)
         }
     }
 
@@ -69,9 +76,9 @@ struct PipelineRunningView: View {
                 .controlSize(.small)
                 .progressViewStyle(.circular)
             VStack(alignment: .leading, spacing: 2) {
-                Text(currentMessage).font(.system(size: 13, weight: .medium))
+                Text(currentMessage).font(.system(size: 13, weight: .medium)).foregroundStyle(Theme.ink)
                 if let detail = currentDetail {
-                    Text(detail).font(.system(size: 11)).foregroundStyle(.secondary)
+                    Text(detail).font(.system(size: 11)).foregroundStyle(Theme.muted)
                 }
             }
             Spacer()
@@ -80,8 +87,16 @@ struct PipelineRunningView: View {
         }
         .padding(14)
         .background(
-            RoundedRectangle(cornerRadius: 8)
-                .fill(Color.accentColor.opacity(0.10))
+            RoundedRectangle(cornerRadius: Theme.radius, style: .continuous)
+                .fill(Theme.card)
+                .overlay(alignment: .leading) {
+                    Rectangle().fill(Theme.indigo).frame(width: 2)
+                }
+                .overlay(
+                    RoundedRectangle(cornerRadius: Theme.radius, style: .continuous)
+                        .stroke(Theme.border, lineWidth: 1)
+                )
+                .clipShape(RoundedRectangle(cornerRadius: Theme.radius, style: .continuous))
         )
     }
 
@@ -107,10 +122,10 @@ struct PipelineRunningView: View {
 
     private var activitySection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Activity log")
-                .font(.system(size: 11, weight: .semibold))
-                .tracking(0.4)
-                .foregroundStyle(.secondary)
+            Text("ACTIVITY LOG")
+                .font(.system(size: 10, weight: .regular))
+                .tracking(0.8)
+                .foregroundStyle(Theme.muted)
             ActivityLogView(lines: appState.activityLog)
                 .frame(minHeight: 240, maxHeight: 320)
         }
@@ -118,15 +133,15 @@ struct PipelineRunningView: View {
 
     private var whatsNext: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("What's next")
-                .font(.system(size: 11, weight: .semibold))
-                .tracking(0.4)
-                .foregroundStyle(.secondary)
+            Text("WHAT'S NEXT")
+                .font(.system(size: 10, weight: .regular))
+                .tracking(0.8)
+                .foregroundStyle(Theme.muted)
             Text(
                 "Once transcription finishes, Claude runs \(appState.options.passes) detection pass\(appState.options.passes == 1 ? "" : "es") to find retakes and false starts. You'll then review each proposed cut one-by-one before any rendering happens."
             )
             .font(.system(size: 13))
-            .foregroundStyle(.secondary)
+            .foregroundStyle(Theme.bodyText)
             .fixedSize(horizontal: false, vertical: true)
         }
     }
@@ -144,7 +159,7 @@ struct ActivityLogView: View {
                         HStack(alignment: .firstTextBaseline, spacing: 8) {
                             Text(timestamp(line.timestamp))
                                 .font(.system(size: 11, design: .monospaced))
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(Theme.tertiary)
                             Text(line.text)
                                 .font(.system(size: 12, design: .monospaced))
                                 .foregroundStyle(color(for: line.level))
@@ -158,8 +173,12 @@ struct ActivityLogView: View {
                 .padding(.horizontal, 12)
             }
             .background(
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(Color(nsColor: .controlBackgroundColor))
+                RoundedRectangle(cornerRadius: Theme.radius, style: .continuous)
+                    .fill(Theme.elevated)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: Theme.radius, style: .continuous)
+                            .stroke(Theme.border, lineWidth: 1)
+                    )
             )
             .onChange(of: lines.count) {
                 withAnimation(.linear(duration: 0.1)) {
@@ -181,11 +200,11 @@ struct ActivityLogView: View {
 
     private func color(for level: LogLine.Level) -> Color {
         switch level {
-        case .info: return Color.accentColor
-        case .ok: return .green
-        case .warn: return .yellow
-        case .err: return .red
-        case .dim: return .secondary
+        case .info: return Theme.indigo
+        case .ok: return Theme.good
+        case .warn: return Theme.warn
+        case .err: return Theme.danger
+        case .dim: return Theme.tertiary
         }
     }
 }

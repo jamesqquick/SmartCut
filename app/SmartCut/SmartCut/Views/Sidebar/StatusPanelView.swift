@@ -8,9 +8,9 @@ struct StatusPanelView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             SidebarSectionHeader("Status")
-            row(label: "ffmpeg", value: "ready", tint: .green)
-            row(label: "whisper", value: "base.en", tint: .secondary)
-            row(label: "API key", value: "configured", tint: .green)
+            row(label: "ffmpeg", value: "ready", tint: Theme.good)
+            row(label: "whisper", value: "base.en", tint: Theme.muted)
+            row(label: "API key", value: "configured", tint: Theme.good)
         }
     }
 
@@ -41,16 +41,16 @@ struct AppShell<Sidebar: View, Content: View>: View {
             .padding(.vertical, 18)
             .padding(.horizontal, 6)
             .frame(width: 240)
-            .background(Color(nsColor: .controlBackgroundColor))
+            .background(Theme.card)
             .overlay(alignment: .trailing) {
                 Rectangle()
-                    .fill(Color(nsColor: .separatorColor))
+                    .fill(Theme.border)
                     .frame(width: 1)
             }
 
             content
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(Color(nsColor: .windowBackgroundColor))
+                .background(Theme.canvas)
         }
     }
 }

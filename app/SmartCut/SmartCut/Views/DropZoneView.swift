@@ -4,6 +4,7 @@ import UniformTypeIdentifiers
 
 struct DropZoneView: View {
     @Environment(AppState.self) private var appState
+    @Environment(\.colorScheme) private var colorScheme
 
     @State private var isTargeted = false
     @State private var isLoadingMetadata = false
@@ -33,14 +34,14 @@ struct DropZoneView: View {
 
             Text("SmartCut will detect silence and AI-flagged retakes, then let you review each cut.")
                 .font(.system(size: 12))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Theme.muted)
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: 480)
 
             if let error = appState.errorMessage {
                 Text(error)
                     .font(.system(size: 12))
-                    .foregroundStyle(.red)
+                    .foregroundStyle(Theme.danger)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 24)
             }
@@ -48,22 +49,38 @@ struct DropZoneView: View {
         }
         .padding(.horizontal, 36)
         .padding(.vertical, 28)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(alignment: .topTrailing) {
+            Theme.halo(colorScheme)
+                .frame(width: 720, height: 520)
+                .offset(x: 160, y: -140)
+                .allowsHitTesting(false)
+        }
     }
 
     private var dropZone: some View {
         VStack(spacing: 14) {
-            Text("🎬").font(.system(size: 48))
+            Image(systemName: "film.stack")
+                .font(.system(size: 26, weight: .light))
+                .foregroundStyle(Theme.indigo)
+                .frame(width: 56, height: 56)
+                .background(
+                    RoundedRectangle(cornerRadius: Theme.radius, style: .continuous)
+                        .fill(Theme.wash)
+                )
             Text("Drop a video here")
-                .font(.system(size: 22, weight: .semibold))
+                .font(.system(size: 22, weight: .light))
+                .foregroundStyle(Theme.ink)
             Text("Supported: .mp4, .mov, .mkv, .webm")
                 .font(.system(size: 12))
-                .foregroundStyle(.secondary)
-            Text("or").font(.system(size: 11)).foregroundStyle(.secondary)
+                .foregroundStyle(Theme.muted)
+            Text("or").font(.system(size: 11)).foregroundStyle(Theme.tertiary)
             Button(action: openFilePicker) {
                 Text("Choose file…")
                     .frame(minWidth: 140)
             }
             .controlSize(.large)
+            .buttonStyle(.borderedProminent)
             .disabled(isLoadingMetadata)
 
             if isLoadingMetadata {
@@ -75,14 +92,14 @@ struct DropZoneView: View {
         .padding(.vertical, 60)
         .padding(.horizontal, 24)
         .background(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .strokeBorder(
-                    isTargeted ? Color.accentColor : Color(nsColor: .separatorColor),
-                    style: StrokeStyle(lineWidth: 2, dash: [6, 5])
-                )
-                .background(
-                    RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .fill(isTargeted ? Color.accentColor.opacity(0.06) : Color.clear)
+            RoundedRectangle(cornerRadius: Theme.radius, style: .continuous)
+                .fill(isTargeted ? Theme.wash : Theme.card)
+                .overlay(
+                    RoundedRectangle(cornerRadius: Theme.radius, style: .continuous)
+                        .strokeBorder(
+                            isTargeted ? Theme.indigo : Theme.borderStrong,
+                            style: StrokeStyle(lineWidth: 2, dash: [6, 5])
+                        )
                 )
         )
         .onDrop(of: [UTType.movie, UTType.video, UTType.fileURL], isTargeted: $isTargeted) { providers in

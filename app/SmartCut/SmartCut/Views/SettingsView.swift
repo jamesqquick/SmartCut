@@ -3,6 +3,7 @@ import SwiftUI
 
 struct SettingsView: View {
     @Environment(AppState.self) private var appState
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         @Bindable var appState = appState
@@ -26,11 +27,17 @@ struct SettingsView: View {
     }
 
     private var header: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text("Review settings").font(.system(size: 22, weight: .semibold))
+        VStack(alignment: .leading, spacing: 6) {
+            Text("CONFIGURE")
+                .font(.system(size: 10, weight: .regular))
+                .tracking(0.8)
+                .foregroundStyle(Theme.muted)
+            Text("Review settings")
+                .font(.system(size: 28, weight: .light))
+                .gradientTitle(colorScheme)
             Text("These mirror the quietcut smartcut CLI flags. Defaults match the CLI.")
                 .font(.system(size: 12))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Theme.bodyText)
         }
     }
 
@@ -38,11 +45,19 @@ struct SettingsView: View {
     private var fileCard: some View {
         if let url = appState.droppedFile {
             HStack(spacing: 14) {
-                Text("🎬").font(.system(size: 32))
+                Image(systemName: "video.fill")
+                    .font(.system(size: 18))
+                    .foregroundStyle(Theme.indigo)
+                    .frame(width: 44, height: 44)
+                    .background(
+                        RoundedRectangle(cornerRadius: Theme.radius, style: .continuous)
+                            .fill(Theme.wash)
+                    )
                 VStack(alignment: .leading, spacing: 4) {
                     Text(url.lastPathComponent)
                         .font(.system(size: 14, weight: .medium))
-                    Text(metadataLine).font(.system(size: 11)).foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.ink)
+                    Text(metadataLine).font(.system(size: 11)).foregroundStyle(Theme.muted)
                 }
                 Spacer()
                 Button("Change…") { appState.resetToDrop() }
@@ -50,8 +65,12 @@ struct SettingsView: View {
             }
             .padding(12)
             .background(
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(Color(nsColor: .controlBackgroundColor))
+                RoundedRectangle(cornerRadius: Theme.radius, style: .continuous)
+                    .fill(Theme.card)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: Theme.radius, style: .continuous)
+                            .stroke(Theme.border, lineWidth: 1)
+                    )
             )
         }
     }
@@ -196,10 +215,22 @@ private struct FormSection<Content: View>: View {
     @ViewBuilder let content: Content
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text(title).font(.system(size: 14, weight: .semibold))
+            Text(title.uppercased())
+                .font(.system(size: 10, weight: .regular))
+                .tracking(0.8)
+                .foregroundStyle(Theme.muted)
             content
         }
-        .padding(.vertical, 8)
+        .padding(20)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: Theme.radius, style: .continuous)
+                .fill(Theme.card)
+                .overlay(
+                    RoundedRectangle(cornerRadius: Theme.radius, style: .continuous)
+                        .stroke(Theme.border, lineWidth: 1)
+                )
+        )
     }
 }
 

@@ -21,11 +21,11 @@ struct RetakeCardView: View {
         }
         .padding(22)
         .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(Color(nsColor: .controlBackgroundColor))
+            RoundedRectangle(cornerRadius: Theme.radius, style: .continuous)
+                .fill(Theme.card)
                 .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
+                    RoundedRectangle(cornerRadius: Theme.radius, style: .continuous)
+                        .stroke(Theme.border, lineWidth: 1)
                 )
         )
         // When the user advances to the next proposal, stop any preview
@@ -44,19 +44,21 @@ struct RetakeCardView: View {
         HStack(alignment: .firstTextBaseline) {
             VStack(alignment: .leading, spacing: 6) {
                 Text("Possible retake")
-                    .font(.system(size: 16, weight: .semibold))
+                    .font(.system(size: 18, weight: .light))
+                    .foregroundStyle(Theme.ink)
                 HStack(spacing: 8) {
                     Text("\(Formatters.time(op.start)) → \(Formatters.time(op.end))")
                         .font(.system(size: 12, design: .monospaced))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.muted)
                     Text("−\(Formatters.shortDuration(op.duration))")
-                        .font(.system(size: 11, weight: .medium))
+                        .font(.system(size: 11, weight: .medium, design: .monospaced))
                         .padding(.horizontal, 8)
                         .padding(.vertical, 2)
                         .background(
-                            Capsule().fill(Color.red.opacity(0.16))
+                            RoundedRectangle(cornerRadius: Theme.radiusSmall)
+                                .fill(Theme.danger.opacity(0.12))
                         )
-                        .foregroundStyle(.red)
+                        .foregroundStyle(Theme.danger)
                 }
             }
             Spacer()
@@ -69,12 +71,12 @@ struct RetakeCardView: View {
             FieldLabel("Remove this")
             Text("\u{201C}\(op.removedText)\u{201D}")
                 .font(.system(size: 13))
-                .foregroundStyle(.red)
+                .foregroundStyle(Theme.danger)
                 .padding(12)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(
-                    RoundedRectangle(cornerRadius: 6)
-                        .fill(Color.red.opacity(0.08))
+                    RoundedRectangle(cornerRadius: Theme.radius, style: .continuous)
+                        .fill(Theme.danger.opacity(0.08))
                 )
         }
     }
@@ -84,7 +86,7 @@ struct RetakeCardView: View {
             FieldLabel("Why")
             Text(op.reason)
                 .font(.system(size: 12))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Theme.bodyText)
                 .fixedSize(horizontal: false, vertical: true)
         }
     }
@@ -98,8 +100,12 @@ struct RetakeCardView: View {
             .padding(12)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(
-                RoundedRectangle(cornerRadius: 6)
-                    .fill(Color(nsColor: .underPageBackgroundColor))
+                RoundedRectangle(cornerRadius: Theme.radius, style: .continuous)
+                    .fill(Theme.elevated)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: Theme.radius, style: .continuous)
+                            .stroke(Theme.border, lineWidth: 1)
+                    )
             )
         }
     }
@@ -110,11 +116,11 @@ struct RetakeCardView: View {
         let after = op.contextAfter.trimmingCharacters(in: .whitespacesAndNewlines)
         var text = Text("")
         if !before.isEmpty {
-            text = text + Text("…\(before) ").foregroundStyle(.secondary)
+            text = text + Text("…\(before) ").foregroundStyle(Theme.tertiary)
         }
-        text = text + Text(kept).foregroundStyle(.green)
+        text = text + Text(kept).foregroundStyle(Theme.good)
         if !after.isEmpty {
-            text = text + Text(" \(after)…").foregroundStyle(.secondary)
+            text = text + Text(" \(after)…").foregroundStyle(Theme.tertiary)
         }
         return text.font(.system(size: 13)).fixedSize(horizontal: false, vertical: true)
     }
@@ -124,19 +130,19 @@ struct RetakeCardView: View {
             audioButton(
                 key: removedKey,
                 title: "Play removed clip (\(Formatters.shortDuration(op.duration)))",
-                tint: .secondary,
+                tint: Theme.good,
                 action: playRemovedClip
             )
             audioButton(
                 key: stitchedKey,
                 title: "Play stitched preview",
-                tint: .accentColor,
+                tint: Theme.teal,
                 action: playStitchedPreview
             )
             if let error = audio.errorMessage {
                 Text(error)
                     .font(.system(size: 11))
-                    .foregroundStyle(.red)
+                    .foregroundStyle(Theme.danger)
                     .lineLimit(1)
             }
         }
@@ -160,19 +166,17 @@ struct RetakeCardView: View {
                 } else {
                     Image(systemName: symbol).foregroundStyle(tint)
                 }
-                Text(title).font(.system(size: 12))
+                Text(title).font(.system(size: 12)).foregroundStyle(Theme.ink)
             }
             .padding(.vertical, 8)
             .padding(.horizontal, 12)
             .background(
-                RoundedRectangle(cornerRadius: 6)
-                    .fill(Color(nsColor: .controlColor))
+                RoundedRectangle(cornerRadius: Theme.radius, style: .continuous)
+                    .fill(Theme.elevated)
                     .overlay(
-                        RoundedRectangle(cornerRadius: 6)
+                        RoundedRectangle(cornerRadius: Theme.radius, style: .continuous)
                             .stroke(
-                                playing
-                                    ? Color.accentColor
-                                    : Color(nsColor: .separatorColor),
+                                playing ? Theme.indigo : Theme.borderStrong,
                                 lineWidth: 1)
                     )
             )
@@ -216,7 +220,7 @@ struct RetakeCardView: View {
                         .padding(.horizontal, 6)
                 }
                 .buttonStyle(.borderedProminent)
-                .tint(.red)
+                .tint(Theme.danger)
                 .controlSize(.large)
                 .keyboardShortcut("r", modifiers: [])
                 KeyBadge("R")
@@ -264,10 +268,10 @@ private struct KeyBadge: View {
             .padding(.horizontal, 5)
             .padding(.vertical, 1)
             .background(
-                RoundedRectangle(cornerRadius: 3)
-                    .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
+                RoundedRectangle(cornerRadius: Theme.radiusSmall)
+                    .stroke(Theme.borderStrong, lineWidth: 1)
             )
-            .foregroundStyle(.secondary)
+            .foregroundStyle(Theme.muted)
     }
 }
 
@@ -276,9 +280,9 @@ private struct FieldLabel: View {
     init(_ text: String) { self.text = text }
     var body: some View {
         Text(text.uppercased())
-            .font(.system(size: 10, weight: .semibold))
-            .tracking(0.5)
-            .foregroundStyle(.secondary)
+            .font(.system(size: 10, weight: .regular))
+            .tracking(0.8)
+            .foregroundStyle(Theme.muted)
     }
 }
 
@@ -289,32 +293,26 @@ private struct ConfidenceBadge: View {
         let clamped = max(0, min(100, value))
         VStack(alignment: .trailing, spacing: 6) {
             Text("CONFIDENCE")
-                .font(.system(size: 9, weight: .semibold))
-                .tracking(0.5)
-                .foregroundStyle(.secondary)
+                .font(.system(size: 9, weight: .regular))
+                .tracking(0.8)
+                .foregroundStyle(Theme.muted)
             HStack(spacing: 8) {
                 bar
                 Text(String(format: "%.0f%%", clamped))
                     .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(tint)
+                    .foregroundStyle(Theme.ink)
                     .monospacedDigit()
             }
         }
     }
 
-    private var tint: Color {
-        if value >= 80 { return .green }
-        if value >= 50 { return .yellow }
-        return .red
-    }
-
     private var bar: some View {
         GeometryReader { geo in
             ZStack(alignment: .leading) {
-                RoundedRectangle(cornerRadius: 3)
-                    .fill(Color(nsColor: .separatorColor))
-                RoundedRectangle(cornerRadius: 3)
-                    .fill(tint)
+                RoundedRectangle(cornerRadius: Theme.radiusSmall)
+                    .fill(Theme.border)
+                RoundedRectangle(cornerRadius: Theme.radiusSmall)
+                    .fill(Theme.indigo)
                     .frame(width: max(2, geo.size.width * value / 100))
             }
         }
