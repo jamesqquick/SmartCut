@@ -32,12 +32,7 @@ struct ErrorBanner: View {
                         .font(.system(size: 11, weight: .medium))
                         .foregroundStyle(Theme.muted)
 
-                        Button("Restart sidecar") {
-                            appState.restartSidecar()
-                        }
-                        .controlSize(.small)
-
-                        Button("Dismiss") {
+                        Button("Start Over") {
                             appState.dismissError()
                         }
                         .controlSize(.small)
@@ -58,7 +53,11 @@ struct ErrorBanner: View {
         }
         .background(
             RoundedRectangle(cornerRadius: Theme.radius, style: .continuous)
-                .fill(Theme.danger.opacity(0.10))
+                .fill(Theme.elevated)
+                .overlay(
+                    RoundedRectangle(cornerRadius: Theme.radius, style: .continuous)
+                        .fill(Theme.danger.opacity(0.08))
+                )
                 .overlay(
                     RoundedRectangle(cornerRadius: Theme.radius, style: .continuous)
                         .stroke(Theme.danger.opacity(0.35), lineWidth: 1)
