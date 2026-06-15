@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  ts:
+    name: TypeScript workspace
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Build
+        run: pnpm build
+
+      # Core unit tests only. The quietcut-server integration suite needs a
+      # media fixture + AI Gateway credentials and is skipped here; the Swift
+      # app build needs a macOS runner with brew ffmpeg/whisper and is out of
+      # scope for CI.
+      - name: Test (quietcut-core)
+        run: pnpm --filter quietcut-core test
