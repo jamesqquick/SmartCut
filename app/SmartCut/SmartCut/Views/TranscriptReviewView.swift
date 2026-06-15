@@ -251,15 +251,25 @@ struct TranscriptReviewView: View {
             let startFrame = wordFrames[cut.removeStartIndex],
             let endFrame = wordFrames[cut.removeEndIndex]
         {
+            let hitWidth = boundaryHitWidth(startFrame: startFrame, endFrame: endFrame)
             // Leading edge of the first removed word.
-            handle(boundaryX: startFrame.minX, top: startFrame.minY, height: startFrame.height) {
-                value in
+            BoundaryHandle(
+                boundaryX: startFrame.minX,
+                top: startFrame.minY,
+                height: startFrame.height,
+                hitWidth: hitWidth
+            ) { value in
                 if let idx = nearestWordIndex(to: value.location) {
                     appState.adjustCutStart(cut.opId, to: idx)
                 }
             }
             // Trailing edge of the last removed word.
-            handle(boundaryX: endFrame.maxX, top: endFrame.minY, height: endFrame.height) { value in
+            BoundaryHandle(
+                boundaryX: endFrame.maxX,
+                top: endFrame.minY,
+                height: endFrame.height,
+                hitWidth: hitWidth
+            ) { value in
                 if let idx = nearestWordIndex(to: value.location) {
                     appState.adjustCutEnd(cut.opId, to: idx)
                 }
@@ -267,34 +277,17 @@ struct TranscriptReviewView: View {
         }
     }
 
-    /// A draggable boundary handle. Uses `.offset` (not `.position`) so its
-    /// drawn shape *and* its hit region move to the boundary — keeping the two
-    /// handles from each grabbing the whole transcript.
-    private func handle(
-        boundaryX: CGFloat,
-        top: CGFloat,
-        height: CGFloat,
-        onDrag: @escaping (DragGesture.Value) -> Void
-    ) -> some View {
-        let hitWidth: CGFloat = 14
-        let barHeight = max(18, height + 6)
-        return ZStack {
-            RoundedRectangle(cornerRadius: 2)
-                .fill(Theme.indigo)
-                .frame(width: 3, height: barHeight)
-            Circle()
-                .fill(Theme.indigo)
-                .frame(width: 11, height: 11)
-                .overlay(Circle().stroke(.white, lineWidth: 1.5))
-                .offset(y: -barHeight / 2)
-        }
-        .frame(width: hitWidth, height: barHeight + 11)
-        .contentShape(Rectangle())
-        .offset(x: boundaryX - hitWidth / 2, y: top - 5.5)
-        .gesture(
-            DragGesture(coordinateSpace: .named("tx"))
-                .onChanged(onDrag)
-        )
+    /// Resting hit width for the boundary handles. Grows the grab target well
+    /// beyond the visible bar so it's easy to land on, but clamps it so the two
+    /// handles never meaningfully overlap when the cut spans only a few short
+    /// words on a single line. Handles on different lines never overlap, so they
+    /// always get the full target.
+    private func boundaryHitWidth(startFrame: CGRect, endFrame: CGRect) -> CGFloat {
+        let desired: CGFloat = 30
+        let sameLine = abs(startFrame.minY - endFrame.minY) < 1
+        guard sameLine else { return desired }
+        let gap = endFrame.maxX - startFrame.minX
+        return min(desired, max(gap, 12))
     }
 
     /// Index of the transcript word whose frame center is nearest `point`.
@@ -336,6 +329,64 @@ struct TranscriptReviewView: View {
         default:
             return .ignored
         }
+    }
+}
+
+// MARK: - Boundary handle
+
+/// A draggable boundary handle for resizing a cut. Owns its own hover state so
+/// it can grow + brighten and swap to a left-right resize cursor when the
+/// pointer is over it, making the thin bar much easier to find and grab.
+///
+/// Uses `.offset` (not `.position`) so its drawn shape *and* its hit region move
+/// to the boundary — keeping the two handles from each grabbing the whole
+/// transcript. The hit region (`hitWidth`) is intentionally far wider than the
+/// visible bar; its size is fixed regardless of hover so the grab target never
+/// shifts under the cursor.
+private struct BoundaryHandle: View {
+    let boundaryX: CGFloat
+    let top: CGFloat
+    let height: CGFloat
+    let hitWidth: CGFloat
+    let onDrag: (DragGesture.Value) -> Void
+
+    @State private var hovering = false
+
+    var body: some View {
+        let barHeight = max(18, height + 6)
+        let color = hovering ? Theme.indigoHover : Theme.indigo
+        return ZStack {
+            RoundedRectangle(cornerRadius: 2)
+                .fill(color)
+                .frame(width: hovering ? 4 : 3, height: barHeight)
+            Circle()
+                .fill(color)
+                .frame(width: hovering ? 14 : 11, height: hovering ? 14 : 11)
+                .overlay(Circle().stroke(.white, lineWidth: 1.5))
+                .offset(y: -barHeight / 2)
+        }
+        .animation(.easeOut(duration: 0.12), value: hovering)
+        .frame(width: hitWidth, height: barHeight + 11)
+        .contentShape(Rectangle())
+        .offset(x: boundaryX - hitWidth / 2, y: top - 5.5)
+        .onHover { inside in
+            hovering = inside
+            if inside {
+                NSCursor.resizeLeftRight.push()
+            } else {
+                NSCursor.pop()
+            }
+        }
+        .onDisappear {
+            if hovering {
+                NSCursor.pop()
+                hovering = false
+            }
+        }
+        .gesture(
+            DragGesture(coordinateSpace: .named("tx"))
+                .onChanged(onDrag)
+        )
     }
 }
 
