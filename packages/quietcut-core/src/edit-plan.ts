@@ -1,7 +1,7 @@
 import { readFile, writeFile } from "node:fs/promises";
 import {
-  invertToKeep,
   applyPadding,
+  invertToKeep,
   mergeOverlaps,
   subtractRegions,
 } from "./segments.js";
@@ -51,7 +51,7 @@ const REMOVE_TYPES = new Set(["removeSilence", "removeRetake"]);
 export function buildEditPlan(
   source: string,
   duration: number,
-  operations: EditOperation[]
+  operations: EditOperation[],
 ): EditPlan {
   const sorted = [...operations].sort((a, b) => a.start - b.start);
   return { source, duration, operations: sorted };
@@ -62,7 +62,7 @@ export function buildEditPlan(
  */
 export function retakeOps(plan: EditPlan): RemoveRetakeOp[] {
   return plan.operations.filter(
-    (op): op is RemoveRetakeOp => op.type === "removeRetake"
+    (op): op is RemoveRetakeOp => op.type === "removeRetake",
   );
 }
 
@@ -73,7 +73,7 @@ export function retakeOps(plan: EditPlan): RemoveRetakeOp[] {
 export function planToKeepSegments(
   plan: EditPlan,
   leadInMs: number,
-  tailOutMs: number
+  tailOutMs: number,
 ): Segment[] {
   const cuts: Segment[] = plan.operations
     .filter((op) => op.type === "removeSilence" || op.type === "removeRetake")
@@ -82,7 +82,7 @@ export function planToKeepSegments(
   const mergedCuts = mergeOverlaps(cuts);
   const raw = invertToKeep(mergedCuts, plan.duration);
   const padded = mergeOverlaps(
-    applyPadding(raw, leadInMs, tailOutMs, plan.duration)
+    applyPadding(raw, leadInMs, tailOutMs, plan.duration),
   );
 
   // Padding adds breathing room around silence cuts, but it must never bleed
@@ -122,7 +122,7 @@ export async function loadPlan(path: string): Promise<EditPlan> {
     !Array.isArray((parsed as EditPlan).operations)
   ) {
     throw new Error(
-      "Plan file is missing required fields (source, duration, operations)."
+      "Plan file is missing required fields (source, duration, operations).",
     );
   }
 
@@ -135,24 +135,26 @@ export async function loadPlan(path: string): Promise<EditPlan> {
   for (let i = 0; i < plan.operations.length; i++) {
     const op = plan.operations[i];
     if (!REMOVE_TYPES.has(op.type)) {
-      throw new Error(`Plan contains unsupported operation type: "${op.type}".`);
+      throw new Error(
+        `Plan contains unsupported operation type: "${op.type}".`,
+      );
     }
     if (typeof op.start !== "number" || typeof op.end !== "number") {
       throw new Error("Plan operation is missing numeric start/end.");
     }
     if (!Number.isFinite(op.start) || !Number.isFinite(op.end)) {
       throw new Error(
-        `Plan operation ${i} has a non-finite start/end (${op.start}, ${op.end}).`
+        `Plan operation ${i} has a non-finite start/end (${op.start}, ${op.end}).`,
       );
     }
     if (op.start < 0 || op.end > plan.duration) {
       throw new Error(
-        `Plan operation ${i} (${op.start}–${op.end}) falls outside the source duration (0–${plan.duration}).`
+        `Plan operation ${i} (${op.start}–${op.end}) falls outside the source duration (0–${plan.duration}).`,
       );
     }
     if (op.end <= op.start) {
       throw new Error(
-        `Plan operation ${i} has a non-positive span (start ${op.start} >= end ${op.end}).`
+        `Plan operation ${i} has a non-positive span (start ${op.start} >= end ${op.end}).`,
       );
     }
   }

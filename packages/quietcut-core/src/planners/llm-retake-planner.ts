@@ -1,9 +1,8 @@
 import type Anthropic from "@anthropic-ai/sdk";
-import chalk from "chalk";
+import type { RemoveRetakeOp } from "../edit-plan.js";
 import { detectRetakesLLM } from "../llm/detect-retakes-llm.js";
 import { snapRetakeCutRegion } from "../retake/snap.js";
-import type { Token, Segment } from "../types.js";
-import type { RemoveRetakeOp } from "../edit-plan.js";
+import type { Segment, Token } from "../types.js";
 
 function midpointInAnyCut(token: Token, cuts: Segment[]): boolean {
   const mid = (token.start + token.end) / 2;
@@ -39,7 +38,7 @@ export async function planLlmRetakeOps(
   tokens: Token[],
   snapSilences: Segment[],
   maxRetakeRatio?: number,
-  passes: number = 2
+  passes: number = 2,
 ): Promise<RemoveRetakeOp[]> {
   const allOps: RemoveRetakeOp[] = [];
   const cutRegions: Segment[] = [];
@@ -54,7 +53,7 @@ export async function planLlmRetakeOps(
       client,
       model,
       working,
-      maxRetakeRatio
+      maxRetakeRatio,
     );
     if (retakes.length === 0) break;
 
@@ -87,9 +86,7 @@ export async function planLlmRetakeOps(
 
   if (passesRun > 1) {
     console.log(
-      chalk.dim(
-        `Retake detection ran ${passesRun} passes; ${allOps.length} total cut(s).`
-      )
+      `Retake detection ran ${passesRun} passes; ${allOps.length} total cut(s).`,
     );
   }
 

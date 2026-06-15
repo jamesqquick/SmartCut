@@ -1,11 +1,11 @@
-import Table from "cli-table3";
-import chalk from "chalk";
 import path from "node:path";
+import chalk from "chalk";
+import Table from "cli-table3";
 import {
+  type EditPlan,
   formatDuration,
   formatTime,
   retakeOps,
-  type EditPlan,
   type Segment,
 } from "quietcut-core";
 
@@ -55,12 +55,12 @@ export function printSmartcutPreview(
   plan: EditPlan,
   keep: Segment[],
   duration: number,
-  inputFile: string
+  inputFile: string,
 ): void {
   const summary = summarize(keep, duration);
   const filename = path.basename(inputFile);
   const silenceCount = plan.operations.filter(
-    (op) => op.type === "removeSilence"
+    (op) => op.type === "removeSilence",
   ).length;
   const retakeCount = retakeOps(plan).length;
 
@@ -80,9 +80,11 @@ export function printSmartcutPreview(
         chalk.bold(`Retake ${i + 1}`) +
           `  ${chalk.dim(formatTime(op.start))} → ${chalk.dim(formatTime(op.end))}` +
           `  ${chalk.red(`-${formatDuration(cutDuration)}`)}` +
-          `  ${chalk.dim("confidence")} ${formatConfidence(op.confidence)}`
+          `  ${chalk.dim("confidence")} ${formatConfidence(op.confidence)}`,
       );
-      console.log(`  ${chalk.dim("Remove:")}  ${chalk.red(`"${op.removedText}"`)}`);
+      console.log(
+        `  ${chalk.dim("Remove:")}  ${chalk.red(`"${op.removedText}"`)}`,
+      );
       console.log(`  ${chalk.dim("Reason:")}  ${chalk.dim(op.reason)}`);
       console.log(`  ${chalk.dim("Result if removed:")}`);
       const before = op.contextBefore ?? "";
@@ -131,13 +133,13 @@ export function printSmartcutPreview(
   console.log(table.toString());
   console.log();
   console.log(
-    `  ${chalk.dim("Original:")}  ${formatDuration(summary.originalDuration)}`
+    `  ${chalk.dim("Original:")}  ${formatDuration(summary.originalDuration)}`,
   );
   console.log(
-    `  ${chalk.dim("New:     ")}  ${chalk.green(formatDuration(summary.newDuration))}`
+    `  ${chalk.dim("New:     ")}  ${chalk.green(formatDuration(summary.newDuration))}`,
   );
   console.log(
-    `  ${chalk.dim("Saved:   ")}  ${chalk.yellow(formatDuration(summary.saved))}  ${chalk.dim(`(${summary.savedPercent.toFixed(1)}%)`)}`
+    `  ${chalk.dim("Saved:   ")}  ${chalk.yellow(formatDuration(summary.saved))}  ${chalk.dim(`(${summary.savedPercent.toFixed(1)}%)`)}`,
   );
   console.log(`  ${chalk.dim("Cuts:    ")}  ${summary.cutCount}`);
   console.log();

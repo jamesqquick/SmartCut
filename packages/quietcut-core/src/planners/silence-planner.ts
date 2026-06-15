@@ -1,4 +1,9 @@
-import { invertToKeep, applyPadding, mergeOverlaps, summarize } from "../segments.js";
+import {
+  applyPadding,
+  invertToKeep,
+  mergeOverlaps,
+  summarize,
+} from "../segments.js";
 import type { Segment, Summary } from "../types.js";
 
 export type SilencePlanResult = {
@@ -20,7 +25,7 @@ export function planSilenceCuts(
   silences: Segment[],
   duration: number,
   leadInMs: number,
-  tailOutMs: number
+  tailOutMs: number,
 ): SilencePlanResult {
   const raw = invertToKeep(silences, duration);
   const padded = applyPadding(raw, leadInMs, tailOutMs, duration);

@@ -1,5 +1,5 @@
-import { execa } from "execa";
 import { stat } from "node:fs/promises";
+import { execa } from "execa";
 
 export type VideoMetadata = {
   durationSec: number;
@@ -34,7 +34,7 @@ export async function getMetadata(path: string): Promise<VideoMetadata> {
     probe = JSON.parse(stdout) as ProbeOutput;
   } catch (err) {
     throw new Error(
-      `Could not parse ffprobe output for ${path}: ${(err as Error).message}`
+      `Could not parse ffprobe output for ${path}: ${(err as Error).message}`,
     );
   }
 

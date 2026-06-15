@@ -34,7 +34,7 @@ export function applyPadding(
   segments: Segment[],
   leadInMs: number,
   tailOutMs: number,
-  duration: number
+  duration: number,
 ): Segment[] {
   const leadIn = leadInMs / 1000;
   const tailOut = tailOutMs / 1000;
@@ -131,7 +131,7 @@ export function summarize(keep: Segment[], originalDuration: number): Summary {
 export function checkPaddingWarning(
   minSilenceSeconds: number,
   leadInMs: number,
-  tailOutMs: number
+  tailOutMs: number,
 ): string | null {
   const paddingSeconds = (leadInMs + tailOutMs) / 1000;
   if (minSilenceSeconds < paddingSeconds) {

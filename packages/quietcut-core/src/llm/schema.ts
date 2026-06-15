@@ -108,7 +108,7 @@ export class RetakeValidationError extends Error {
  */
 export function validateRetakeCuts(
   input: RetakeToolInput,
-  tokenCount: number
+  tokenCount: number,
 ): RetakeCut[] {
   const cuts = input.cuts;
 
@@ -121,18 +121,18 @@ export function validateRetakeCuts(
     ] as const) {
       if (idx >= tokenCount) {
         throw new RetakeValidationError(
-          `cuts[${i}].${label} (${idx}) is out of range (max ${tokenCount - 1}).`
+          `cuts[${i}].${label} (${idx}) is out of range (max ${tokenCount - 1}).`,
         );
       }
     }
     if (c.abandonedStartIndex >= c.keepStartIndex) {
       throw new RetakeValidationError(
-        `cuts[${i}]: abandonedStartIndex (${c.abandonedStartIndex}) must be less than keepStartIndex (${c.keepStartIndex}).`
+        `cuts[${i}]: abandonedStartIndex (${c.abandonedStartIndex}) must be less than keepStartIndex (${c.keepStartIndex}).`,
       );
     }
     if (c.keepStartIndex > c.keepEndIndex) {
       throw new RetakeValidationError(
-        `cuts[${i}]: keepStartIndex (${c.keepStartIndex}) must be <= keepEndIndex (${c.keepEndIndex}).`
+        `cuts[${i}]: keepStartIndex (${c.keepStartIndex}) must be <= keepEndIndex (${c.keepEndIndex}).`,
       );
     }
   }
@@ -140,14 +140,14 @@ export function validateRetakeCuts(
   // Cuts must be disjoint and ordered: each cut must start after the previous
   // cut's kept take ends.
   const sorted = [...cuts].sort(
-    (a, b) => a.abandonedStartIndex - b.abandonedStartIndex
+    (a, b) => a.abandonedStartIndex - b.abandonedStartIndex,
   );
   for (let i = 1; i < sorted.length; i++) {
     const prev = sorted[i - 1];
     const curr = sorted[i];
     if (curr.abandonedStartIndex <= prev.keepEndIndex) {
       throw new RetakeValidationError(
-        `cuts overlap: a cut starting at ${curr.abandonedStartIndex} begins before the previous kept take ends at ${prev.keepEndIndex}. Cuts must be disjoint.`
+        `cuts overlap: a cut starting at ${curr.abandonedStartIndex} begins before the previous kept take ends at ${prev.keepEndIndex}. Cuts must be disjoint.`,
       );
     }
   }
@@ -177,7 +177,7 @@ export type DroppedCut = { reason: string };
  */
 export function sanitizeRetakeCuts(
   cuts: RetakeCut[],
-  tokenCount: number
+  tokenCount: number,
 ): { cuts: RetakeCut[]; dropped: DroppedCut[] } {
   const dropped: DroppedCut[] = [];
   const cleaned: RetakeCut[] = [];
@@ -186,9 +186,10 @@ export function sanitizeRetakeCuts(
     const c = { ...original };
 
     // Normalize confidence into [0, 100]; default to 50 when missing/garbage.
-    const conf = typeof c.confidence === "number" && Number.isFinite(c.confidence)
-      ? Math.max(0, Math.min(100, Math.round(c.confidence)))
-      : 50;
+    const conf =
+      typeof c.confidence === "number" && Number.isFinite(c.confidence)
+        ? Math.max(0, Math.min(100, Math.round(c.confidence)))
+        : 50;
     c.confidence = conf;
 
     // Clamp a single off-by-one on the (inclusive) kept-take end.

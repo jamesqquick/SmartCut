@@ -1,6 +1,6 @@
 import { detectRetakes } from "../retake/detect-repeats.js";
 import { snapMatches } from "../retake/snap.js";
-import type { Token, RetakeMatch, Segment } from "../types.js";
+import type { RetakeMatch, Segment, Token } from "../types.js";
 
 export type RetakePlanResult = {
   matches: RetakeMatch[];
@@ -20,7 +20,7 @@ export function planRetakeCuts(
   tokens: Token[],
   snapSilences: Segment[],
   minWords: number,
-  maxGapSeconds: number
+  maxGapSeconds: number,
 ): RetakePlanResult {
   const rawMatches = detectRetakes(tokens, minWords, maxGapSeconds);
   const matches = snapMatches(rawMatches, snapSilences);

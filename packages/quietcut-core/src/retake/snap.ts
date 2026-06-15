@@ -1,4 +1,4 @@
-import type { Segment, RetakeMatch } from "../types.js";
+import type { RetakeMatch, Segment } from "../types.js";
 
 const SNAP_WINDOW_SECONDS = 0.5;
 
@@ -10,7 +10,7 @@ const SNAP_WINDOW_SECONDS = 0.5;
  */
 export function snapToCutRegion(
   cutRegion: Segment,
-  silences: Segment[]
+  silences: Segment[],
 ): Segment {
   return {
     start: snapTime(cutRegion.start, silences, "end"),
@@ -23,7 +23,7 @@ export function snapToCutRegion(
  */
 export function snapMatches(
   matches: RetakeMatch[],
-  silences: Segment[]
+  silences: Segment[],
 ): RetakeMatch[] {
   return matches.map((m) => ({
     ...m,
@@ -60,13 +60,13 @@ export function snapMatches(
  */
 export function snapRetakeCutRegion(
   cutRegion: Segment,
-  silences: Segment[]
+  silences: Segment[],
 ): Segment {
   const start = snapToSilenceEnd(cutRegion.start, silences);
   // Never let the end advance past the kept word's onset (clip protection).
   const end = Math.min(
     cutRegion.end,
-    snapToSilenceEnd(cutRegion.end, silences)
+    snapToSilenceEnd(cutRegion.end, silences),
   );
   // Snapping must never invert or collapse the cut; if it would, keep original.
   if (end <= start) return { start: cutRegion.start, end: cutRegion.end };
@@ -107,7 +107,7 @@ function snapToSilenceEnd(time: number, silences: Segment[]): number {
 function snapTime(
   time: number,
   silences: Segment[],
-  side: "start" | "end"
+  side: "start" | "end",
 ): number {
   let best = time;
   let bestDist = Infinity;

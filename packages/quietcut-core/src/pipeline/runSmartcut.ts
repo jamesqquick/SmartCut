@@ -1,35 +1,35 @@
 import { existsSync } from "node:fs";
 import { stat } from "node:fs/promises";
+import { detectSilences } from "../detect.js";
+import {
+  buildEditPlan,
+  type EditOperation,
+  type EditPlan,
+  loadPlan,
+  planToKeepSegments,
+  type RemoveRetakeOp,
+  type RemoveSilenceOp,
+  retakeOps,
+  savePlan,
+} from "../edit-plan.js";
+import { createGatewayClient, resolveGatewayEnv } from "../llm/gateway.js";
+import { planLlmRetakeOps } from "../planners/llm-retake-planner.js";
+import { render } from "../render.js";
+import {
+  loadTokensFromTranscript,
+  transcribeFromAudio,
+} from "../retake/transcribe.js";
+import { summarize } from "../segments.js";
+import type { Segment, SmartcutConfig, Token } from "../types.js";
 import {
   assertFfmpegAvailable,
   extractAudio,
   getDuration,
 } from "../utils/ffmpeg.js";
 import { warnIfUnsupportedContainer } from "../utils/paths.js";
-import { detectSilences } from "../detect.js";
-import { summarize } from "../segments.js";
-import { render } from "../render.js";
 import { formatDuration } from "../utils/time.js";
-import {
-  loadTokensFromTranscript,
-  transcribeFromAudio,
-} from "../retake/transcribe.js";
-import { createGatewayClient, resolveGatewayEnv } from "../llm/gateway.js";
-import { planLlmRetakeOps } from "../planners/llm-retake-planner.js";
-import {
-  buildEditPlan,
-  loadPlan,
-  planToKeepSegments,
-  retakeOps,
-  savePlan,
-  type EditOperation,
-  type EditPlan,
-  type RemoveRetakeOp,
-  type RemoveSilenceOp,
-} from "../edit-plan.js";
-import type { Segment, SmartcutConfig, Token } from "../types.js";
-import type { PipelineEvent, Stage } from "./events.js";
 import type { RetakeDecision } from "./decisions.js";
+import type { PipelineEvent, Stage } from "./events.js";
 
 /**
  * The async generator that drives a smartcut run.
@@ -44,7 +44,7 @@ import type { RetakeDecision } from "./decisions.js";
  */
 export async function* runSmartcut(
   config: SmartcutConfig,
-  whisperModel: string
+  whisperModel: string,
 ): AsyncGenerator<PipelineEvent, void, RetakeDecision | undefined> {
   const overallStart = Date.now();
   const stageStarts = new Map<Stage, number>();
@@ -194,7 +194,7 @@ export async function* runSmartcut(
             preset: config.preset,
           },
           duration,
-          wavPath
+          wavPath,
         );
         silenceSegments = result.silences;
         yield {
@@ -204,7 +204,7 @@ export async function* runSmartcut(
         };
         yield stageDone(
           "silence-coarse",
-          `Found ${silenceSegments.length} silence region${silenceSegments.length !== 1 ? "s" : ""}.`
+          `Found ${silenceSegments.length} silence region${silenceSegments.length !== 1 ? "s" : ""}.`,
         );
       } catch (err) {
         yield stageFail("silence-coarse", "Silence detection failed.");
@@ -234,12 +234,12 @@ export async function* runSmartcut(
             preset: config.preset,
           },
           duration,
-          wavPath
+          wavPath,
         );
         snapSilences = result.silences;
         yield stageDone(
           "silence-fine",
-          `Found ${snapSilences.length} snap point${snapSilences.length !== 1 ? "s" : ""}.`
+          `Found ${snapSilences.length} snap point${snapSilences.length !== 1 ? "s" : ""}.`,
         );
       } catch {
         // best-effort — non-fatal
@@ -256,7 +256,7 @@ export async function* runSmartcut(
         if (config.transcriptPath) {
           tokens = await loadTokensFromTranscript(
             config.transcriptPath,
-            config.fillerWords
+            config.fillerWords,
           );
         } else {
           tokens = await transcribeFromAudio(wavPath, {
@@ -277,7 +277,7 @@ export async function* runSmartcut(
         };
         yield stageDone(
           "transcribe",
-          `Transcribed: ${tokens.length} word${tokens.length !== 1 ? "s" : ""}.`
+          `Transcribed: ${tokens.length} word${tokens.length !== 1 ? "s" : ""}.`,
         );
       } catch (err) {
         yield stageFail("transcribe", "Transcription failed.");
@@ -292,7 +292,7 @@ export async function* runSmartcut(
       // --- LLM retake detection -----------------------------------------
       yield stageStart(
         "detect-retakes",
-        `Detecting retakes with ${config.model} (via AI Gateway)...`
+        `Detecting retakes with ${config.model} (via AI Gateway)...`,
       );
       let retakeOperations: RemoveRetakeOp[];
       try {
@@ -303,11 +303,11 @@ export async function* runSmartcut(
           tokens,
           snapSilences,
           config.maxRetakeRatio,
-          config.passes
+          config.passes,
         );
         yield stageDone(
           "detect-retakes",
-          `Found ${retakeOperations.length} retake${retakeOperations.length !== 1 ? "s" : ""}.`
+          `Found ${retakeOperations.length} retake${retakeOperations.length !== 1 ? "s" : ""}.`,
         );
       } catch (err) {
         yield stageFail("detect-retakes", "Retake detection failed.");
@@ -414,7 +414,7 @@ export async function* runSmartcut(
 
     // Replace retake ops in the plan with only the approved set.
     const keptOps: EditOperation[] = plan.operations.filter(
-      (op) => op.type !== "removeRetake"
+      (op) => op.type !== "removeRetake",
     );
     finalPlan = {
       ...plan,
@@ -422,7 +422,7 @@ export async function* runSmartcut(
     };
     yield stageDone(
       "review",
-      `Approved ${approved.length} of ${allRetakes.length}.`
+      `Approved ${approved.length} of ${allRetakes.length}.`,
     );
   }
 
@@ -497,10 +497,10 @@ export async function* runSmartcut(
         });
         flushProgress();
       },
-    }
+    },
   ).then(
     () => ({ ok: true as const }),
-    (err: unknown) => ({ ok: false as const, err })
+    (err: unknown) => ({ ok: false as const, err }),
   );
 
   let renderResult: { ok: true } | { ok: false; err: unknown } | null = null;
@@ -535,7 +535,7 @@ export async function* runSmartcut(
 
   yield stageDone(
     "render",
-    `Render complete (${((Date.now() - renderStart) / 1000).toFixed(1)}s).`
+    `Render complete (${((Date.now() - renderStart) / 1000).toFixed(1)}s).`,
   );
 
   yield {

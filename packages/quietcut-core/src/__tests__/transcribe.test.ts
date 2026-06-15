@@ -1,7 +1,7 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
-  extractModelSize,
   collapseRepeatedSegments,
+  extractModelSize,
 } from "../retake/transcribe.js";
 
 describe("extractModelSize (DTW preset mapping)", () => {
@@ -9,7 +9,9 @@ describe("extractModelSize (DTW preset mapping)", () => {
     // The bug that broke large-v3: filename uses hyphens, --dtw wants dots.
     expect(extractModelSize("ggml-large-v3.bin", "large-v3")).toBe("large.v3");
     expect(extractModelSize("ggml-large-v2.bin", "large-v2")).toBe("large.v2");
-    expect(extractModelSize("/x/y/ggml-large-v1.bin", "large-v1")).toBe("large.v1");
+    expect(extractModelSize("/x/y/ggml-large-v1.bin", "large-v1")).toBe(
+      "large.v1",
+    );
   });
 
   it("maps bare 'large' to the newest preset", () => {
@@ -45,7 +47,11 @@ function seg(text: string, fromMs: number, toMs: number) {
 describe("collapseRepeatedSegments", () => {
   it("collapses a long run of identical segments (hallucination loop)", () => {
     const segs = Array.from({ length: 50 }, (_, i) =>
-      seg("And I'm going to go to the next page here.", i * 1000, (i + 1) * 1000)
+      seg(
+        "And I'm going to go to the next page here.",
+        i * 1000,
+        (i + 1) * 1000,
+      ),
     );
     const { segments, collapsed } = collapseRepeatedSegments(segs);
     expect(segments).toHaveLength(1);
@@ -68,7 +74,11 @@ describe("collapseRepeatedSegments", () => {
 
   it("matches ignoring punctuation/case differences", () => {
     const segs = Array.from({ length: 8 }, (_, i) =>
-      seg(i % 2 === 0 ? "Go to the next page." : "go to the next page", i, i + 1)
+      seg(
+        i % 2 === 0 ? "Go to the next page." : "go to the next page",
+        i,
+        i + 1,
+      ),
     );
     const { segments, collapsed } = collapseRepeatedSegments(segs);
     expect(segments).toHaveLength(1);

@@ -1,14 +1,14 @@
-import { describe, it, expect } from "vitest";
-import { mkdtemp, writeFile, rm } from "node:fs/promises";
-import { join } from "node:path";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { describe, expect, it } from "vitest";
 import {
   buildEditPlan,
-  planToKeepSegments,
-  loadPlan,
-  savePlan,
-  retakeOps,
   type EditOperation,
+  loadPlan,
+  planToKeepSegments,
+  retakeOps,
+  savePlan,
 } from "../edit-plan.js";
 
 describe("planToKeepSegments", () => {

@@ -155,13 +155,19 @@ trigger the setup sheet.
 # Core library unit tests (55 tests):
 pnpm --filter quietcut-core test
 
-# Sidecar integration tests (7 tests, needs .env + fixture):
-pnpm --filter quietcut-server test
-
-# Phase 1 verification gate (side-by-side with legacy CLI):
-SMARTCUT_FIXTURE="$HOME/Movies/2026-06-11 11-44-01.mov" \
-  packages/quietcut-core/__fixtures__/verify.sh
+# Sidecar integration tests (needs .env + fixture):
+SMARTCUT_FIXTURE="$HOME/Movies/your-clip.mov" \
+  pnpm --filter quietcut-server test
 ```
+
+## Versioning
+
+The version lives in two places that must be bumped together:
+
+- `app/SmartCut/project.yml` (`CFBundleShortVersionString`) — the macOS app.
+- the four `package.json` files (`version`) — the TS workspace.
+
+There's no automated sync yet; update both when cutting a release.
 
 ## Non-goals (v1)
 

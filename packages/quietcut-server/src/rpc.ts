@@ -113,7 +113,7 @@ export class RpcDispatchError extends Error {
   constructor(
     public readonly code: number,
     message: string,
-    public readonly data?: unknown
+    public readonly data?: unknown,
   ) {
     super(message);
     this.name = "RpcDispatchError";
@@ -126,8 +126,11 @@ export class RpcDispatchError extends Error {
  * line is blank.
  */
 export function parseRpcLine(
-  line: string
-): { kind: "request"; request: RpcRequest } | { kind: "error"; response: RpcFailure } | null {
+  line: string,
+):
+  | { kind: "request"; request: RpcRequest }
+  | { kind: "error"; response: RpcFailure }
+  | null {
   const trimmed = line.trim();
   if (trimmed === "") return null;
 
@@ -168,7 +171,10 @@ export function parseRpcLine(
       kind: "error",
       response: {
         jsonrpc: "2.0",
-        id: typeof obj.id === "number" || typeof obj.id === "string" ? obj.id : null,
+        id:
+          typeof obj.id === "number" || typeof obj.id === "string"
+            ? obj.id
+            : null,
         error: {
           code: RPC_ERROR.invalidRequest,
           message: "Missing or invalid jsonrpc/method fields",

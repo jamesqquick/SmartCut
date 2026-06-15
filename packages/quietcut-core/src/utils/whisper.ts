@@ -4,8 +4,8 @@ import { execa } from "execa";
 // "main" is intentionally excluded — it's too generic and will false-positive
 // match unrelated binaries that happen to be named "main" on PATH.
 const WHISPER_CANDIDATES = [
-  "whisper-cli",   // whisper.cpp >= v1.7 default binary name
-  "whisper",       // some package managers (e.g. pip openai-whisper) use this name
+  "whisper-cli", // whisper.cpp >= v1.7 default binary name
+  "whisper", // some package managers (e.g. pip openai-whisper) use this name
 ];
 
 /**
@@ -41,7 +41,7 @@ export async function assertWhisperAvailable(): Promise<string> {
         `Quick install (Homebrew):\n` +
         `  brew install whisper-cpp\n\n` +
         `Or build from source:\n` +
-        `  git clone https://github.com/ggerganov/whisper.cpp && cd whisper.cpp && make`
+        `  git clone https://github.com/ggerganov/whisper.cpp && cd whisper.cpp && make`,
     );
   }
   return bin;

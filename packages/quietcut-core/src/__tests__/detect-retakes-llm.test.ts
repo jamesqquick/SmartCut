@@ -1,5 +1,5 @@
-import { describe, it, expect } from "vitest";
 import type Anthropic from "@anthropic-ai/sdk";
+import { describe, expect, it } from "vitest";
 import { detectRetakesLLM } from "../llm/detect-retakes-llm.js";
 import type { Token } from "../types.js";
 
@@ -36,7 +36,9 @@ function textOnlyClient(): Anthropic {
     messages: {
       stream: () =>
         asStream({
-          content: [{ type: "text", text: "There are no retakes in this transcript." }],
+          content: [
+            { type: "text", text: "There are no retakes in this transcript." },
+          ],
         }),
     },
   } as unknown as Anthropic;
@@ -83,7 +85,12 @@ describe("detectRetakesLLM", () => {
     ];
     // Model anchors the abandoned start one word late (at "first", index 1).
     const client = fakeClient([
-      { abandonedStartIndex: 1, keepStartIndex: 5, keepEndIndex: 11, reason: "restart" },
+      {
+        abandonedStartIndex: 1,
+        keepStartIndex: 5,
+        keepEndIndex: 11,
+        reason: "restart",
+      },
     ]);
 
     const result = await detectRetakesLLM(client, "m", tokens);
@@ -99,10 +106,16 @@ describe("detectRetakesLLM", () => {
     // 20 distinct words deleted to keep a single word -> ratio 20:1. That's not
     // a re-recording; it's a mis-pairing / looping transcript.
     const tokens = Array.from({ length: 21 }, (_, i) =>
-      tok(`w${i}`, i, i + 0.5)
+      tok(`w${i}`, i, i + 0.5),
     );
     const client = fakeClient([
-      { abandonedStartIndex: 0, keepStartIndex: 20, keepEndIndex: 20, reason: "x", confidence: 90 },
+      {
+        abandonedStartIndex: 0,
+        keepStartIndex: 20,
+        keepEndIndex: 20,
+        reason: "x",
+        confidence: 90,
+      },
     ]);
     // Default ratio guard (15) drops it...
     expect(await detectRetakesLLM(client, "m", tokens)).toEqual([]);
@@ -127,7 +140,13 @@ describe("detectRetakesLLM", () => {
       tok("continue", 689.8, 690.3),
     ];
     const client = fakeClient([
-      { abandonedStartIndex: 0, keepStartIndex: 4, keepEndIndex: 6, reason: "x", confidence: 85 },
+      {
+        abandonedStartIndex: 0,
+        keepStartIndex: 4,
+        keepEndIndex: 6,
+        reason: "x",
+        confidence: 85,
+      },
     ]);
     expect(await detectRetakesLLM(client, "m", tokens)).toEqual([]);
   });
@@ -140,7 +159,13 @@ describe("detectRetakesLLM", () => {
       tok("world", 1.4, 1.7),
     ];
     const client = fakeClient([
-      { abandonedStartIndex: 0, keepStartIndex: 2, keepEndIndex: 3, reason: "restart", confidence: 88 },
+      {
+        abandonedStartIndex: 0,
+        keepStartIndex: 2,
+        keepEndIndex: 3,
+        reason: "restart",
+        confidence: 88,
+      },
     ]);
     const result = await detectRetakesLLM(client, "m", tokens);
     expect(result).toHaveLength(1);
@@ -150,7 +175,12 @@ describe("detectRetakesLLM", () => {
   it("drops a cut whose kept-onset timestamp precedes the abandoned start (jitter guard)", async () => {
     const tokens = [tok("A", 5.0, 5.2), tok("B", 5.3, 5.6), tok("C", 4.0, 4.3)];
     const client = fakeClient([
-      { abandonedStartIndex: 0, keepStartIndex: 2, keepEndIndex: 2, reason: "x" },
+      {
+        abandonedStartIndex: 0,
+        keepStartIndex: 2,
+        keepEndIndex: 2,
+        reason: "x",
+      },
     ]);
     const result = await detectRetakesLLM(client, "m", tokens);
     expect(result).toEqual([]);
@@ -171,7 +201,12 @@ describe("detectRetakesLLM", () => {
     // After merge the indices are: [0]rollbacks [1]are [2]hard [3]rollbacks
     // [4]are [5]tricky. Abandoned take = 0..2, kept take = 3..5.
     const client = fakeClient([
-      { abandonedStartIndex: 0, keepStartIndex: 3, keepEndIndex: 5, reason: "restart" },
+      {
+        abandonedStartIndex: 0,
+        keepStartIndex: 3,
+        keepEndIndex: 5,
+        reason: "restart",
+      },
     ]);
     const result = await detectRetakesLLM(client, "m", raw);
     expect(result).toHaveLength(1);

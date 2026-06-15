@@ -32,10 +32,10 @@ export type Summary = {
 // --- Retake types ---
 
 export type Token = {
-  word: string;       // original text from whisper
+  word: string; // original text from whisper
   normalized: string; // lowercase, punctuation stripped
-  start: number;      // seconds
-  end: number;        // seconds
+  start: number; // seconds
+  end: number; // seconds
   isFiller: boolean;
   // True when whisper emitted this piece with a leading space, i.e. it begins a
   // new word. When false, the piece is a continuation of the previous token
@@ -54,11 +54,11 @@ export type RetakeMatch = {
 export type RetakeConfig = {
   input: string;
   output: string;
-  minWords: number;          // default 3
-  maxGapSeconds: number;     // default 3
+  minWords: number; // default 3
+  maxGapSeconds: number; // default 3
   fillerWords: Set<string>;
-  model: string;             // whisper model, default "base.en"
-  transcriptPath?: string;   // reuse existing transcript JSON
+  model: string; // whisper model, default "base.en"
+  transcriptPath?: string; // reuse existing transcript JSON
   saveTranscriptPath?: string;
   skipApproval: boolean;
   dryRun: boolean;
@@ -97,7 +97,7 @@ export type CleanConfig = {
   output: string;
   // silence detection params
   thresholdDb: number;
-  minSilence: number;       // seconds
+  minSilence: number; // seconds
   // retake detection params
   minWords: number;
   maxGapSeconds: number;

@@ -23,11 +23,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.104.1",
-    "@inquirer/prompts": "^7.5.2",
-    "chalk": "^5.4.1",
-    "cli-table3": "^0.6.5",
     "execa": "^9.5.2",
-    "ora": "^8.2.0",
     "zod": "^4.4.3"
   },
   "devDependencies": {

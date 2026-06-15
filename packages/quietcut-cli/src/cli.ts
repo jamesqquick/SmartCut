@@ -1,7 +1,7 @@
-import { Command } from "commander";
-import chalk from "chalk";
 import { existsSync } from "node:fs";
 import { dirname, join } from "node:path";
+import chalk from "chalk";
+import { Command } from "commander";
 import { smartcutCommand } from "./commands/smartcut.js";
 
 /**

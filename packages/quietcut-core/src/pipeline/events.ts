@@ -1,5 +1,5 @@
-import type { Segment } from "../types.js";
 import type { EditPlan, RemoveRetakeOp } from "../edit-plan.js";
+import type { Segment } from "../types.js";
 
 /**
  * Logical stages emitted by `runSmartcut`. Stage events carry a status
