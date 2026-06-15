@@ -26,11 +26,13 @@ jobs:
       - name: Lint
         run: pnpm lint
 
-      - name: Typecheck
-        run: pnpm typecheck
-
+      # Build before typecheck: quietcut-cli/server resolve quietcut-core via
+      # its built dist/*.d.ts, which don't exist on a clean checkout.
       - name: Build
         run: pnpm build
+
+      - name: Typecheck
+        run: pnpm typecheck
 
       # Core unit tests only. The quietcut-server integration suite needs a
       # media fixture + AI Gateway credentials and is skipped here; the Swift
