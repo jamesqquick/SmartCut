@@ -9,8 +9,9 @@ struct AppConfig: Codable, Equatable, Sendable {
     /// Directory containing `ffmpeg` and `whisper-cli` — prepended to
     /// the spawned child's PATH so shell-out commands resolve.
     var ffmpegDir: String?
-    /// Path to the quietcut-server bundle. Defaults to the workspace
-    /// dev location; override when the .app is installed elsewhere.
+    /// Explicit path to the quietcut-server bundle. Optional: when unset the
+    /// app uses the `server.cjs` bundled into its Resources (see project.yml).
+    /// Set this only to override with a custom build.
     var sidecarPath: String?
     /// CF AI Gateway account.
     var cloudflareAccountId: String?

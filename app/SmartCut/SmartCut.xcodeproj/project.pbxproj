@@ -153,6 +153,7 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = 9497004C36281998C7BE9588 /* Build configuration list for PBXNativeTarget "SmartCut" */;
 			buildPhases = (
+				AB0E3448440F2FA8DF3B851B /* Bundle quietcut-server sidecar */,
 				4A4292379FC08A53A5E844C5 /* Sources */,
 				CB05FFAC5853D50BAB136A3C /* Resources */,
 			);
@@ -211,6 +212,28 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		AB0E3448440F2FA8DF3B851B /* Bundle quietcut-server sidecar */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Bundle quietcut-server sidecar";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "set -euo pipefail\nREPO_ROOT=\"$SRCROOT/../..\"\nexport PATH=\"/opt/homebrew/bin:/usr/local/bin:$PATH\"\nSIDECAR=\"$REPO_ROOT/packages/quietcut-server/dist/server.cjs\"\n\n# Rebuild the sidecar when pnpm is on PATH; otherwise fall back to an\n# existing bundle (e.g. CI that built it in a prior step).\nif command -v pnpm >/dev/null 2>&1; then\n  ( cd \"$REPO_ROOT\" && pnpm --filter quietcut-server build )\nfi\n\nif [ ! -f \"$SIDECAR\" ]; then\n  echo \"error: quietcut-server bundle missing at $SIDECAR — run 'pnpm --filter quietcut-server build'.\" >&2\n  exit 1\nfi\n\nDEST=\"$BUILT_PRODUCTS_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH\"\nmkdir -p \"$DEST\"\ncp \"$SIDECAR\" \"$DEST/server.cjs\"\n";
+		};
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		4A4292379FC08A53A5E844C5 /* Sources */ = {

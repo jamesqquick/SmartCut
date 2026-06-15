@@ -65,3 +65,29 @@ targets:
         COMBINE_HIDPI_IMAGES: "YES"
         GENERATE_INFOPLIST_FILE: "NO"
         DEVELOPMENT_TEAM: ""
+    preBuildScripts:
+      # Build the Node sidecar and copy the self-contained server.cjs into the
+      # app bundle's Resources so SmartCut.app is portable (no workspace path
+      # dependency at runtime). Resolved at launch via Bundle.main.
+      - name: Bundle quietcut-server sidecar
+        basedOnDependencyAnalysis: false
+        script: |
+          set -euo pipefail
+          REPO_ROOT="$SRCROOT/../.."
+          export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
+          SIDECAR="$REPO_ROOT/packages/quietcut-server/dist/server.cjs"
+
+          # Rebuild the sidecar when pnpm is on PATH; otherwise fall back to an
+          # existing bundle (e.g. CI that built it in a prior step).
+          if command -v pnpm >/dev/null 2>&1; then
+            ( cd "$REPO_ROOT" && pnpm --filter quietcut-server build )
+          fi
+
+          if [ ! -f "$SIDECAR" ]; then
+            echo "error: quietcut-server bundle missing at $SIDECAR — run 'pnpm --filter quietcut-server build'." >&2
+            exit 1
+          fi
+
+          DEST="$BUILT_PRODUCTS_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH"
+          mkdir -p "$DEST"
+          cp "$SIDECAR" "$DEST/server.cjs"

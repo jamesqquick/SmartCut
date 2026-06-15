@@ -19,10 +19,7 @@ struct SidecarConfig {
 
         let sidecarURL =
             appConfig.sidecarPath.flatMap(nonEmptyURL)
-            ?? URL(
-                fileURLWithPath:
-                    "/Users/jamesqquick/code/SmartCut/packages/quietcut-server/dist/server.cjs"
-            )
+            ?? resolveSidecarBinary()
 
         var paths: [String] = []
         if let dir = appConfig.ffmpegDir, !dir.isEmpty {
@@ -55,6 +52,27 @@ struct SidecarConfig {
         from(.load())
     }
 
+    /// Resolve the bundled `server.cjs`. The app bundles it into Resources
+    /// (see project.yml `preBuildScripts`), making the .app portable. For
+    /// `swift run`/preview contexts where there is no bundle, fall back to a
+    /// dev workspace path derived from `SMARTCUT_DEV_ROOT` (or the repo
+    /// checkout two levels above the executable).
+    private static func resolveSidecarBinary() -> URL {
+        if let bundled = Bundle.main.url(forResource: "server", withExtension: "cjs") {
+            return bundled
+        }
+
+        let env = ProcessInfo.processInfo.environment
+        if let devRoot = env["SMARTCUT_DEV_ROOT"], !devRoot.isEmpty {
+            return URL(fileURLWithPath: devRoot)
+                .appendingPathComponent("packages/quietcut-server/dist/server.cjs")
+        }
+
+        // Last-resort dev fallback: relative to the current working directory.
+        return URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+            .appendingPathComponent("packages/quietcut-server/dist/server.cjs")
+    }
+
     /// Look in well-known Homebrew prefixes (apple silicon, intel) then
     /// fall back to `/usr/bin/env node`. The fallback only works when
     /// `node` is on the GUI's PATH, which is rare from Finder.
@@ -69,18 +87,19 @@ struct SidecarConfig {
         return URL(fileURLWithPath: "/usr/bin/env")
     }
 
-    /// Best-effort load of the workspace `.env` so the spawned sidecar
-    /// can authenticate when launched from a fresh install before the
-    /// user fills in `~/.smartcut/config.json`.
+    /// Best-effort load of a workspace `.env` so the spawned sidecar can
+    /// authenticate during local development before the user fills in
+    /// `~/.smartcut/config.json`. Only consulted when `SMARTCUT_DEV_ROOT`
+    /// points at a checkout; shipped apps rely on `~/.smartcut/config.json`.
     private static func loadDevEnv() -> [String: String] {
-        let candidates = [
-            "/Users/jamesqquick/code/SmartCut/.env",
-            "/Users/jamesqquick/code/local-video-tools/.env",
-        ]
-        for path in candidates {
-            if let contents = try? String(contentsOfFile: path, encoding: .utf8) {
-                return parseDotEnv(contents)
-            }
+        let env = ProcessInfo.processInfo.environment
+        guard let devRoot = env["SMARTCUT_DEV_ROOT"], !devRoot.isEmpty else {
+            return [:]
+        }
+        let path = URL(fileURLWithPath: devRoot)
+            .appendingPathComponent(".env").path
+        if let contents = try? String(contentsOfFile: path, encoding: .utf8) {
+            return parseDotEnv(contents)
         }
         return [:]
     }
