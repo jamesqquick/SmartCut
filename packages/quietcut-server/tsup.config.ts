@@ -10,8 +10,9 @@ export default defineConfig({
   target: "node20",
   clean: true,
   shims: false,
-  // Inline all workspace deps so the Swift app can ship a single file.
-  noExternal: ["quietcut-core"],
+  // Inline all deps (workspace + third-party) so the Swift app can spawn
+  // server.cjs as a fully self-contained file with no node_modules lookup.
+  noExternal: [/.*/],
   banner: {
     js: "#!/usr/bin/env node",
   },
