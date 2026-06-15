@@ -4,8 +4,22 @@
 export { detectSilences } from "./detect.js";
 export * from "./edit-plan.js";
 export { createGatewayClient, resolveGatewayEnv } from "./llm/gateway.js";
-export type { RetakeDecision } from "./pipeline/decisions.js";
-export type { PipelineEvent, Stage } from "./pipeline/events.js";
+export type {
+  RetakeDecision,
+  RetakeReviewResult,
+  ReviewCutDecision,
+} from "./pipeline/decisions.js";
+export type {
+  PipelineEvent,
+  ReviewProposal,
+  Stage,
+} from "./pipeline/events.js";
+export {
+  applyReviewResult,
+  buildReviewProposals,
+  timeRangeToIndices,
+  toTranscriptTokens,
+} from "./pipeline/review-batch.js";
 export { runSmartcut } from "./pipeline/runSmartcut.js";
 export { planLlmRetakeOps } from "./planners/llm-retake-planner.js";
 export { render } from "./render.js";

@@ -358,6 +358,16 @@ final class SidecarClient {
             method: "decide", params: P(opId: opId, action: action.rawValue))
     }
 
+    /// Submit the batch transcript-review result (the final, possibly adjusted,
+    /// set of cuts) in response to a `reviewReady` event.
+    func submitReview(cuts: [ReviewCutDecision]) async throws {
+        struct P: Encodable {
+            let cuts: [ReviewCutDecision]
+        }
+        struct R: Decodable { let ok: Bool }
+        let _: R = try await request(method: "submitReview", params: P(cuts: cuts))
+    }
+
     func cancel() async throws {
         struct R: Decodable {
             let ok: Bool

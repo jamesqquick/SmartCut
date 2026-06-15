@@ -1,5 +1,18 @@
 import type { EditPlan, RemoveRetakeOp } from "../edit-plan.js";
-import type { Segment } from "../types.js";
+import type { Segment, TranscriptToken } from "../types.js";
+
+/**
+ * One AI-suggested retake cut as presented in the batch review screen.
+ * `removeStartIndex`/`removeEndIndex` are inclusive token indices into the
+ * transcript marking the words the cut currently removes; the user can widen
+ * or narrow them, or disable the cut entirely.
+ */
+export type ReviewProposal = {
+  opId: string;
+  op: RemoveRetakeOp;
+  removeStartIndex: number;
+  removeEndIndex: number;
+};
 
 /**
  * Logical stages emitted by `runSmartcut`. Stage events carry a status
@@ -59,6 +72,12 @@ export type PipelineEvent =
   | {
       type: "reviewReady";
       total: number;
+      // Full transcript (whole words + timing) for the batch review screen.
+      // Empty for non-batch (CLI) callers, which only use `total` as a gate.
+      transcript: TranscriptToken[];
+      // AI-suggested cuts mapped to transcript token ranges. Empty when there
+      // are no retakes (the event still fires as a pre-render confirmation).
+      proposals: ReviewProposal[];
     }
   | {
       type: "retakeProposed";

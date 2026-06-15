@@ -138,7 +138,7 @@ struct PipelineRunningView: View {
                 .tracking(0.8)
                 .foregroundStyle(Theme.muted)
             Text(
-                "Once transcription finishes, Claude runs \(appState.options.passes) detection pass\(appState.options.passes == 1 ? "" : "es") to find retakes and false starts. You'll then review each proposed cut one-by-one before any rendering happens."
+                "Once transcription finishes, Claude runs \(appState.options.passes) detection pass\(appState.options.passes == 1 ? "" : "es") to find retakes and false starts. You'll then review the full transcript and fine-tune every proposed cut before any rendering happens."
             )
             .font(.system(size: 13))
             .foregroundStyle(Theme.bodyText)

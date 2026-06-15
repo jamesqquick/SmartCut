@@ -44,6 +44,16 @@ export type Token = {
   leadingSpace?: boolean;
 };
 
+// A single transcript word sent to the review UI. A trimmed-down `Token`
+// (whole word + timing) — no normalization/filler internals the client doesn't
+// need. Indices into the `TranscriptToken[]` array are the unit of selection in
+// the batch review screen.
+export type TranscriptToken = {
+  word: string; // whole word as displayed
+  start: number; // seconds
+  end: number; // seconds
+};
+
 export type RetakeMatch = {
   matchedPhrase: string;
   firstTake: { start: number; end: number; text: string };
@@ -83,6 +93,11 @@ export type SmartcutConfig = {
   saveTranscriptPath?: string;
   planPath?: string; // load a saved EditPlan and skip detection
   savePlanPath?: string; // write the EditPlan JSON after detection
+  // When true, surface all retakes at once with the full transcript via a
+  // single `reviewReady` event and await a batch `RetakeReviewResult` (the
+  // SwiftUI app's transcript-editing flow). When false/undefined, fall back to
+  // the per-cut `retakeProposed` loop (the CLI).
+  batchReview?: boolean;
   // shared render + padding params
   leadInMs: number;
   tailOutMs: number;

@@ -1,5 +1,10 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import { normalizeWord } from "../retake/transcribe.js";
+import {
+  reconstructText,
+  sentenceAfter,
+  sentenceBefore,
+} from "../retake/transcript-text.js";
 import type { Segment, Token } from "../types.js";
 import {
   type RetakeCut,
@@ -60,9 +65,6 @@ export type LlmRetake = {
   contextAfter: string; // sentence after the kept take
   confidence: number; // 0–100, model-reported tempered by delete/keep ratio
 };
-
-const MAX_CONTEXT_WORDS = 6;
-const SENTENCE_END = /[.!?]["')\]]?$/;
 
 const SYSTEM_PROMPT = `You are a video editor's assistant. You are given a transcript of a single-speaker recording (a coding/tech tutorial) as a numbered list of word tokens. The speaker frequently re-records lines: they flub a sentence, pause, and say it again. Your job is to find every spot where the speaker re-recorded something and keep ONLY the latest (final) take.
 
@@ -127,48 +129,6 @@ function buildIndexedTranscript(tokens: Token[]): string {
   return tokens.map((t, i) => `[${i}] ${t.word}`).join(" ");
 }
 
-function reconstructText(tokens: Token[], start: number, end: number): string {
-  return tokens
-    .slice(start, end + 1)
-    .map((t) => t.word)
-    .join(" ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-/**
- * Collect the sentence ending at (and including) token `endIdx`, walking back
- * until the previous token ends a sentence or the word limit is reached.
- */
-function sentenceBefore(tokens: Token[], endIdx: number): string {
-  if (endIdx < 0) return "";
-  let start = endIdx;
-  let count = 0;
-  while (start > 0 && count < MAX_CONTEXT_WORDS) {
-    if (SENTENCE_END.test(tokens[start - 1].word)) break;
-    start--;
-    count++;
-  }
-  return reconstructText(tokens, start, endIdx);
-}
-
-/**
- * Collect the sentence starting at token `startIdx`, walking forward until a
- * sentence-ending token or the word limit is reached.
- */
-function sentenceAfter(tokens: Token[], startIdx: number): string {
-  if (startIdx >= tokens.length) return "";
-  let end = startIdx;
-  let count = 0;
-  while (end < tokens.length && count < MAX_CONTEXT_WORDS) {
-    if (SENTENCE_END.test(tokens[end].word)) break;
-    end++;
-    count++;
-  }
-  end = Math.min(end, tokens.length - 1);
-  return reconstructText(tokens, startIdx, end);
-}
-
 /**
  * Models often anchor `abandonedStartIndex` a word or two too late, leaving the
  * leading word(s) of the repeated phrase duplicated in the output (e.g.
@@ -228,6 +188,45 @@ function extractToolInput(message: Anthropic.Message): unknown {
  * Throws RetakeValidationError only when the tool WAS called but the payload is
  * structurally invalid (so the caller can issue a repair retry).
  */
+// Long, reasoning-heavy streams occasionally drop mid-flight (a reset surfaces
+// as "Connection error", "terminated", or "socket hang up"). The SDK's own
+// retries cover connection *establishment*, but not a reset after the stream
+// has begun, so retry those transient failures here with backoff. Anything
+// else (auth, validation, 4xx) propagates immediately.
+const MAX_STREAM_RETRIES = 3;
+
+function isTransientStreamError(err: unknown): boolean {
+  const msg = (err instanceof Error ? err.message : String(err)).toLowerCase();
+  return (
+    msg.includes("connection error") ||
+    msg.includes("terminated") ||
+    msg.includes("socket hang up") ||
+    msg.includes("econnreset") ||
+    msg.includes("timeout") ||
+    msg.includes("network")
+  );
+}
+
+async function streamFinalMessage(
+  client: Anthropic,
+  params: Anthropic.MessageCreateParamsStreaming,
+): Promise<Anthropic.Message> {
+  let lastErr: unknown;
+  for (let attempt = 0; attempt <= MAX_STREAM_RETRIES; attempt++) {
+    try {
+      return await client.messages.stream(params).finalMessage();
+    } catch (err) {
+      lastErr = err;
+      if (!isTransientStreamError(err) || attempt === MAX_STREAM_RETRIES) {
+        throw err;
+      }
+      const delayMs = 1000 * 2 ** attempt; // 1s, 2s, 4s
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+  }
+  throw lastErr;
+}
+
 async function requestRawCuts(
   client: Anthropic,
   model: string,
@@ -259,8 +258,9 @@ async function requestRawCuts(
 
   // Stream and assemble the final message. A large max_tokens with adaptive
   // thinking can exceed the SDK's 10-minute non-streaming limit, so streaming
-  // is required (the gateway passes SSE through transparently).
-  const message = await client.messages.stream(params).finalMessage();
+  // is required (the gateway passes SSE through transparently). Transient
+  // mid-stream connection drops are retried with backoff.
+  const message = await streamFinalMessage(client, params);
 
   const rawInput = extractToolInput(message);
   if (rawInput === undefined) {

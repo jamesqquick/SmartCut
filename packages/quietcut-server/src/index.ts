@@ -2,6 +2,8 @@ import * as readline from "node:readline";
 import {
   type PipelineEvent,
   type RetakeDecision,
+  type RetakeReviewResult,
+  type ReviewCutDecision,
   runSmartcut,
   type SmartcutConfig,
 } from "quietcut-core";
@@ -15,6 +17,9 @@ import {
   type RpcNotification,
   type RpcResponse,
 } from "./rpc.js";
+
+/** Anything the generator can be resumed with: a per-cut decision or a batch result. */
+type JobDecision = RetakeDecision | RetakeReviewResult;
 
 const DEFAULT_FILLER_WORDS = new Set([
   "um",
@@ -60,7 +65,7 @@ function sendEvent(event: PipelineEvent): void {
 // -----------------------------------------------------------------------------
 
 type JobState = {
-  decisions: AsyncQueue<RetakeDecision>;
+  decisions: AsyncQueue<JobDecision>;
   cancelRequested: boolean;
   /** Resolves once the generator returns. */
   finished: Promise<void>;
@@ -102,6 +107,10 @@ type StartParams = {
 type DecideParams = {
   opId: string;
   action: "remove" | "keep" | "approveRest" | "cancel";
+};
+
+type SubmitReviewParams = {
+  cuts: ReviewCutDecision[];
 };
 
 type ExtractClipParams = {
@@ -207,6 +216,25 @@ dispatcher.register("decide", async (params) => {
   return { ok: true };
 });
 
+dispatcher.register("submitReview", async (params) => {
+  if (!activeJob) {
+    throw new RpcDispatchError(
+      RPC_ERROR.jobNotRunning,
+      "No smartcut job is running",
+    );
+  }
+  const p = params as SubmitReviewParams | undefined;
+  if (!p || !Array.isArray(p.cuts)) {
+    throw new RpcDispatchError(
+      RPC_ERROR.invalidParams,
+      "submitReview requires { cuts: [...] }",
+    );
+  }
+
+  activeJob.decisions.push({ kind: "review", cuts: p.cuts });
+  return { ok: true };
+});
+
 dispatcher.register("cancel", async () => {
   if (!activeJob) return { ok: true, wasRunning: false };
   activeJob.cancelRequested = true;
@@ -244,6 +272,8 @@ function buildConfig(
     saveTranscriptPath: options.saveTranscriptPath,
     planPath: options.planPath,
     savePlanPath: options.savePlanPath,
+    // The app uses the batch transcript-review flow (single reviewReady event).
+    batchReview: true,
     leadInMs: options.leadInMs ?? 300,
     tailOutMs: options.tailOutMs ?? 300,
     skipApproval: options.skipApproval ?? false,
@@ -258,7 +288,7 @@ function buildConfig(
 // -----------------------------------------------------------------------------
 
 function startJob(config: SmartcutConfig, whisperModel: string): JobState {
-  const decisions = new AsyncQueue<RetakeDecision>();
+  const decisions = new AsyncQueue<JobDecision>();
   const state: JobState = {
     decisions,
     cancelRequested: false,
@@ -267,7 +297,7 @@ function startJob(config: SmartcutConfig, whisperModel: string): JobState {
 
   state.finished = (async () => {
     const gen = runSmartcut(config, whisperModel);
-    let nextDecision: RetakeDecision | undefined;
+    let nextDecision: JobDecision | undefined;
 
     try {
       while (true) {
@@ -277,9 +307,9 @@ function startJob(config: SmartcutConfig, whisperModel: string): JobState {
 
         sendEvent(value);
 
-        // If the generator is waiting on a decision, block until the
-        // client sends one via `decide` (or `cancel`). `reviewReady` is the
-        // zero-retake confirmation prompt; it also awaits a decision.
+        // If the generator is waiting on a decision, block until the client
+        // sends one. `retakeProposed` awaits a per-cut `decide`; `reviewReady`
+        // (batch flow) awaits `submitReview` (or `cancel` for either).
         if (value.type === "retakeProposed" || value.type === "reviewReady") {
           if (state.cancelRequested) {
             nextDecision = { kind: "cancel" };

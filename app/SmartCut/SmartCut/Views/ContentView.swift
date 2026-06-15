@@ -43,7 +43,7 @@ struct ContentView: View {
         case .running:
             PipelineRunningView()
         case .review:
-            RetakeReviewView()
+            TranscriptReviewView()
         case .render:
             RenderProgressView()
         case .done:
