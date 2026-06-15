@@ -88,14 +88,13 @@ struct RetakeReviewView: View {
             }
             HStack(spacing: 12) {
                 Button(action: { Task { await appState.confirmRender() } }) {
-                    Text("Render").frame(minWidth: 120)
+                    Text("Render").frame(minWidth: 100)
                 }
                 .keyboardShortcut(.defaultAction)
-                .controlSize(.large)
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(.scPrimary)
 
                 Button("Cancel") { Task { await appState.cancel() } }
-                    .controlSize(.large)
+                    .buttonStyle(.scSecondary)
                     .keyboardShortcut(.cancelAction)
             }
         }

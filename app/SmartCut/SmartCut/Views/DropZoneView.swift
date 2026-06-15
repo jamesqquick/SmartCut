@@ -77,10 +77,9 @@ struct DropZoneView: View {
             Text("or").font(.system(size: 11)).foregroundStyle(Theme.tertiary)
             Button(action: openFilePicker) {
                 Text("Choose file…")
-                    .frame(minWidth: 140)
+                    .frame(minWidth: 120)
             }
-            .controlSize(.large)
-            .buttonStyle(.borderedProminent)
+            .buttonStyle(.scPrimary)
             .disabled(isLoadingMetadata)
 
             if isLoadingMetadata {

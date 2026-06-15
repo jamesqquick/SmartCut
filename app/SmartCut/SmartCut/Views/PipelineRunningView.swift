@@ -83,7 +83,7 @@ struct PipelineRunningView: View {
             }
             Spacer()
             Button("Cancel") { Task { await appState.cancel() } }
-                .controlSize(.small)
+                .buttonStyle(.scGhostCompact)
         }
         .padding(14)
         .background(

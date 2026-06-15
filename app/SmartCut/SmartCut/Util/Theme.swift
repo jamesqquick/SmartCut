@@ -130,4 +130,117 @@ extension View {
     func gradientTitle(_ scheme: ColorScheme) -> some View {
         foregroundStyle(Theme.titleGradient(scheme))
     }
+
+    /// Style a plain `TextField` to match the mockup's input boxes:
+    /// elevated fill, hairline border, comfortable height.
+    func scInputField() -> some View {
+        modifier(SCInputField())
+    }
+}
+
+private struct SCInputField: ViewModifier {
+    func body(content: Content) -> some View {
+        content
+            .textFieldStyle(.plain)
+            .padding(.vertical, 7)
+            .padding(.horizontal, 10)
+            .background(
+                RoundedRectangle(cornerRadius: Theme.radius, style: .continuous)
+                    .fill(Theme.elevated)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: Theme.radius, style: .continuous)
+                            .stroke(Theme.borderStrong, lineWidth: 1)
+                    )
+            )
+    }
+}
+
+// MARK: - Button styles
+
+extension Theme {
+    enum ButtonVariant {
+        /// Filled indigo — the single primary action.
+        case primary
+        /// Outlined Midnight-ink — companion to a primary action.
+        case secondary
+        /// Transparent text — low-emphasis action.
+        case ghost
+        /// Elevated fill + border — neutral default (e.g. "Browse…").
+        case neutral
+        /// Outlined danger — destructive action.
+        case danger
+    }
+}
+
+/// Reusable button style matching the mockup's `.btn` system. Use the
+/// `.scPrimary` / `.scSecondary` / `.scGhost` / `.scNeutral` / `.scDanger`
+/// helpers (each with a `…Compact` size).
+struct SCButtonStyle: ButtonStyle {
+    var variant: Theme.ButtonVariant
+    var prominent: Bool = false
+
+    func makeBody(configuration: Configuration) -> some View {
+        SCButtonBody(variant: variant, prominent: prominent, configuration: configuration)
+    }
+
+    struct SCButtonBody: View {
+        let variant: Theme.ButtonVariant
+        let prominent: Bool
+        let configuration: ButtonStyleConfiguration
+        @Environment(\.isEnabled) private var isEnabled
+
+        var body: some View {
+            configuration.label
+                .font(.system(size: prominent ? 14 : 13, weight: .regular))
+                .foregroundStyle(foreground)
+                .padding(.vertical, prominent ? 10 : 7)
+                .padding(.horizontal, prominent ? 18 : 14)
+                .background(background)
+                .contentShape(RoundedRectangle(cornerRadius: Theme.radius, style: .continuous))
+                .opacity(isEnabled ? 1 : 0.45)
+                .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
+        }
+
+        private var foreground: Color {
+            switch variant {
+            case .primary: return .white
+            case .secondary: return configuration.isPressed ? Theme.canvas : Theme.ink
+            case .neutral: return Theme.ink
+            case .ghost: return Theme.bodyText
+            case .danger: return configuration.isPressed ? .white : Theme.danger
+            }
+        }
+
+        @ViewBuilder private var background: some View {
+            let shape = RoundedRectangle(cornerRadius: Theme.radius, style: .continuous)
+            switch variant {
+            case .primary:
+                shape.fill(configuration.isPressed ? Theme.indigoHover : Theme.indigo)
+            case .secondary:
+                shape.fill(configuration.isPressed ? Theme.ink : Color.clear)
+                    .overlay(shape.stroke(Theme.ink, lineWidth: 1))
+            case .neutral:
+                shape.fill(Theme.elevated)
+                    .overlay(shape.stroke(Theme.borderStrong, lineWidth: 1))
+            case .ghost:
+                shape.fill(configuration.isPressed ? Theme.wash : Color.clear)
+            case .danger:
+                shape.fill(configuration.isPressed ? Theme.danger : Color.clear)
+                    .overlay(shape.stroke(Theme.danger, lineWidth: 1))
+            }
+        }
+    }
+}
+
+extension ButtonStyle where Self == SCButtonStyle {
+    static var scPrimary: SCButtonStyle { .init(variant: .primary, prominent: true) }
+    static var scPrimaryCompact: SCButtonStyle { .init(variant: .primary) }
+    static var scSecondary: SCButtonStyle { .init(variant: .secondary, prominent: true) }
+    static var scSecondaryCompact: SCButtonStyle { .init(variant: .secondary) }
+    static var scGhost: SCButtonStyle { .init(variant: .ghost, prominent: true) }
+    static var scGhostCompact: SCButtonStyle { .init(variant: .ghost) }
+    static var scNeutral: SCButtonStyle { .init(variant: .neutral) }
+    static var scNeutralCompact: SCButtonStyle { .init(variant: .neutral) }
+    static var scDanger: SCButtonStyle { .init(variant: .danger, prominent: true) }
+    static var scDangerCompact: SCButtonStyle { .init(variant: .danger) }
 }

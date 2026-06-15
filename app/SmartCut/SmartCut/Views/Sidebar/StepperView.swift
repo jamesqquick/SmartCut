@@ -17,7 +17,7 @@ struct StepperView: View {
     ]
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
+        VStack(alignment: .leading, spacing: 4) {
             SidebarSectionHeader("Pipeline")
             ForEach(order, id: \.self) { stage in
                 row(for: stage)
@@ -54,7 +54,7 @@ struct StepperView: View {
             }
             Spacer(minLength: 0)
         }
-        .padding(.vertical, 6)
+        .padding(.vertical, 9)
         .padding(.horizontal, 10)
         .background(isActive ? Theme.wash : Color.clear)
         .clipShape(RoundedRectangle(cornerRadius: Theme.radius, style: .continuous))

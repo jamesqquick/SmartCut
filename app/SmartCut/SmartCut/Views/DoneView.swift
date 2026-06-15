@@ -171,25 +171,24 @@ struct DoneView: View {
             Button {
                 NSWorkspace.shared.activateFileViewerSelecting([summary.outputPath])
             } label: {
-                Text("Reveal in Finder").frame(minWidth: 140)
+                Text("Reveal in Finder")
             }
-            .controlSize(.large)
-            .buttonStyle(.borderedProminent)
+            .buttonStyle(.scPrimary)
             .keyboardShortcut(.defaultAction)
 
             Button {
                 NSWorkspace.shared.open(summary.outputPath)
             } label: {
-                Text("Open").frame(minWidth: 100)
+                Text("Open").frame(minWidth: 64)
             }
-            .controlSize(.large)
+            .buttonStyle(.scSecondary)
 
             Button {
                 appState.resetToDrop()
             } label: {
-                Text("Process another").frame(minWidth: 140)
+                Text("Process another")
             }
-            .controlSize(.large)
+            .buttonStyle(.scGhost)
         }
     }
 }

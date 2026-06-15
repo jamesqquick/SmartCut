@@ -100,7 +100,7 @@ struct RenderProgressView: View {
                 .padding(.top, 6)
 
             Button("Cancel render") { Task { await appState.cancel() } }
-                .controlSize(.large)
+                .buttonStyle(.scSecondary)
                 .padding(.top, 16)
         }
         .padding(28)

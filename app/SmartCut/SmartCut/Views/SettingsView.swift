@@ -61,7 +61,7 @@ struct SettingsView: View {
                 }
                 Spacer()
                 Button("Change…") { appState.resetToDrop() }
-                    .controlSize(.small)
+                    .buttonStyle(.scGhostCompact)
             }
             .padding(12)
             .background(
@@ -95,6 +95,7 @@ struct SettingsView: View {
                 value: binding.options.thresholdDb,
                 format: "%.0f"
             )
+            rowDivider
             LabeledNumber(
                 label: "Minimum length",
                 hint: "Cut silences this long or longer",
@@ -108,8 +109,7 @@ struct SettingsView: View {
 
     private func retakeForm(binding: Bindable<AppState>) -> some View {
         FormSection(title: "AI retake detection") {
-            HStack(alignment: .center, spacing: 24) {
-                Text("Model").frame(width: 160, alignment: .leading)
+            FormRow(label: "Model") {
                 Picker("", selection: binding.options.model) {
                     Text("claude-opus-4-8").tag("claude-opus-4-8")
                     Text("claude-sonnet-4-5").tag("claude-sonnet-4-5")
@@ -119,24 +119,18 @@ struct SettingsView: View {
                 .frame(maxWidth: 260, alignment: .leading)
                 Spacer()
             }
-
-            HStack(alignment: .top, spacing: 24) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Passes")
-                    Text("Later passes re-clean leftovers")
-                        .font(.system(size: 11))
-                        .foregroundStyle(.secondary)
-                }
-                .frame(width: 160, alignment: .leading)
+            rowDivider
+            FormRow(label: "Passes", hint: "Later passes re-clean leftovers") {
                 HStack(spacing: 8) {
-                    Text("\(appState.options.passes)").frame(width: 30, alignment: .leading)
+                    TextField("", value: binding.options.passes, format: .number)
+                        .frame(width: 70)
+                        .scInputField()
                     Stepper("", value: binding.options.passes, in: 1...4).labelsHidden()
                 }
                 Spacer()
             }
-
-            HStack(alignment: .center, spacing: 24) {
-                Text("Whisper model").frame(width: 160, alignment: .leading)
+            rowDivider
+            FormRow(label: "Whisper model") {
                 Picker("", selection: binding.options.whisperModel) {
                     Text("base.en").tag("base.en")
                     Text("small.en").tag("small.en")
@@ -151,24 +145,20 @@ struct SettingsView: View {
 
     private func outputForm(binding: Bindable<AppState>) -> some View {
         FormSection(title: "Output") {
-            HStack(alignment: .center, spacing: 24) {
-                Text("Save to").frame(width: 160, alignment: .leading)
+            FormRow(label: "Save to") {
                 TextField("Output path", text: binding.options.output)
-                    .textFieldStyle(.roundedBorder)
+                    .scInputField()
                     .frame(maxWidth: 380)
                 Button("Browse…") { browseForOutput() }
+                    .buttonStyle(.scNeutralCompact)
                 Spacer()
             }
-            HStack(alignment: .top, spacing: 24) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Quality (CRF)")
-                    Text("Lower = better quality, larger file")
-                        .font(.system(size: 11))
-                        .foregroundStyle(.secondary)
-                }
-                .frame(width: 160, alignment: .leading)
+            rowDivider
+            FormRow(label: "Quality (CRF)", hint: "Lower = better quality, larger file") {
                 HStack(spacing: 8) {
-                    Text("\(appState.options.crf)").frame(width: 30, alignment: .leading)
+                    TextField("", value: binding.options.crf, format: .number)
+                        .frame(width: 70)
+                        .scInputField()
                     Stepper("", value: binding.options.crf, in: 12...30).labelsHidden()
                 }
                 Spacer()
@@ -176,17 +166,20 @@ struct SettingsView: View {
         }
     }
 
+    private var rowDivider: some View {
+        Rectangle().fill(Theme.border).frame(height: 1)
+    }
+
     private var actionRow: some View {
         HStack(spacing: 12) {
             Button(action: { Task { await appState.startProcessing() } }) {
-                Text("Start smart cut").frame(minWidth: 140)
+                Text("Start smart cut").frame(minWidth: 120)
             }
             .keyboardShortcut(.defaultAction)
-            .controlSize(.large)
-            .buttonStyle(.borderedProminent)
+            .buttonStyle(.scPrimary)
 
             Button("Cancel") { appState.resetToDrop() }
-                .controlSize(.large)
+                .buttonStyle(.scSecondary)
 
             Spacer()
         }
@@ -214,14 +207,18 @@ private struct FormSection<Content: View>: View {
     let title: String
     @ViewBuilder let content: Content
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 4) {
             Text(title.uppercased())
                 .font(.system(size: 10, weight: .regular))
                 .tracking(0.8)
                 .foregroundStyle(Theme.muted)
-            content
+                .padding(.bottom, 4)
+            VStack(spacing: 0) {
+                content
+            }
         }
-        .padding(20)
+        .padding(.horizontal, 20)
+        .padding(.vertical, 16)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: Theme.radius, style: .continuous)
@@ -234,6 +231,27 @@ private struct FormSection<Content: View>: View {
     }
 }
 
+/// One labeled settings row: a 180pt label/hint column + trailing controls.
+private struct FormRow<Content: View>: View {
+    let label: String
+    var hint: String?
+    @ViewBuilder let content: Content
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 24) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(label).foregroundStyle(Theme.ink)
+                if let hint {
+                    Text(hint).font(.system(size: 11)).foregroundStyle(Theme.muted)
+                }
+            }
+            .frame(width: 180, alignment: .leading)
+            content
+        }
+        .padding(.vertical, 12)
+    }
+}
+
 private struct LabeledNumber: View {
     let label: String
     let hint: String?
@@ -243,21 +261,14 @@ private struct LabeledNumber: View {
     var step: Double = 1
 
     var body: some View {
-        HStack(alignment: .top, spacing: 24) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(label)
-                if let hint {
-                    Text(hint).font(.system(size: 11)).foregroundStyle(.secondary)
-                }
-            }
-            .frame(width: 160, alignment: .leading)
+        FormRow(label: label, hint: hint) {
             HStack(spacing: 8) {
                 TextField("", value: $value, format: .number)
-                    .textFieldStyle(.roundedBorder)
                     .frame(width: 90)
+                    .scInputField()
                 Stepper("", value: $value, step: step).labelsHidden()
                 if let unit {
-                    Text(unit).font(.system(size: 11)).foregroundStyle(.secondary)
+                    Text(unit).font(.system(size: 11)).foregroundStyle(Theme.muted)
                 }
             }
             Spacer()

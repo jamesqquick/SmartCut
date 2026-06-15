@@ -217,11 +217,8 @@ struct RetakeCardView: View {
             HStack(spacing: 6) {
                 Button { Task { await appState.decide(.remove) } } label: {
                     Label("Remove section", systemImage: "scissors")
-                        .padding(.horizontal, 6)
                 }
-                .buttonStyle(.borderedProminent)
-                .tint(Theme.danger)
-                .controlSize(.large)
+                .buttonStyle(.scDangerCompact)
                 .keyboardShortcut("r", modifiers: [])
                 KeyBadge("R")
             }
@@ -229,9 +226,8 @@ struct RetakeCardView: View {
             HStack(spacing: 6) {
                 Button { Task { await appState.decide(.keep) } } label: {
                     Label("Keep it", systemImage: "checkmark")
-                        .padding(.horizontal, 6)
                 }
-                .controlSize(.large)
+                .buttonStyle(.scSecondaryCompact)
                 .keyboardShortcut("k", modifiers: [])
                 KeyBadge("K")
             }
@@ -239,10 +235,8 @@ struct RetakeCardView: View {
             HStack(spacing: 6) {
                 Button { Task { await appState.decide(.approveRest) } } label: {
                     Label("Approve all remaining", systemImage: "checkmark.circle.fill")
-                        .padding(.horizontal, 6)
                 }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.large)
+                .buttonStyle(.scPrimaryCompact)
                 .keyboardShortcut("a", modifiers: [])
                 KeyBadge("A")
             }
@@ -251,7 +245,7 @@ struct RetakeCardView: View {
 
             HStack(spacing: 6) {
                 Button("Cancel") { Task { await appState.cancel() } }
-                    .controlSize(.large)
+                    .buttonStyle(.scGhostCompact)
                     .keyboardShortcut(.cancelAction)
                 KeyBadge("Esc")
             }
