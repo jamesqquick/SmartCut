@@ -109,10 +109,10 @@ struct SettingsView: View {
                         .foregroundStyle(.secondary)
                 }
                 .frame(width: 160, alignment: .leading)
-                Stepper(value: binding.options.passes, in: 1...4) {
-                    Text("\(appState.options.passes)").frame(width: 30, alignment: .trailing)
+                HStack(spacing: 8) {
+                    Text("\(appState.options.passes)").frame(width: 30, alignment: .leading)
+                    Stepper("", value: binding.options.passes, in: 1...4).labelsHidden()
                 }
-                .labelsHidden()
                 Spacer()
             }
 
@@ -148,10 +148,10 @@ struct SettingsView: View {
                         .foregroundStyle(.secondary)
                 }
                 .frame(width: 160, alignment: .leading)
-                Stepper(value: binding.options.crf, in: 12...30) {
-                    Text("\(appState.options.crf)").frame(width: 30, alignment: .trailing)
+                HStack(spacing: 8) {
+                    Text("\(appState.options.crf)").frame(width: 30, alignment: .leading)
+                    Stepper("", value: binding.options.crf, in: 12...30).labelsHidden()
                 }
-                .labelsHidden()
                 Spacer()
             }
         }

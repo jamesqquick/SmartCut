@@ -57,18 +57,47 @@ struct RetakeReviewView: View {
     private var content: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
-                header
-                progressBar
-                if let proposal = appState.currentRetake {
-                    RetakeCardView(proposal: proposal)
+                if appState.awaitingReviewConfirmation {
+                    noRetakesConfirmation
                 } else {
-                    waitingPlaceholder
+                    header
+                    progressBar
+                    if let proposal = appState.currentRetake {
+                        RetakeCardView(proposal: proposal)
+                    } else {
+                        waitingPlaceholder
+                    }
                 }
             }
             .padding(.horizontal, 36)
             .padding(.vertical, 28)
             .frame(maxWidth: .infinity, alignment: .topLeading)
         }
+    }
+
+    private var noRetakesConfirmation: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("No retakes detected")
+                    .font(.system(size: 22, weight: .semibold))
+                Text("Only silence cuts will be applied. Render the result?")
+                    .font(.system(size: 13))
+                    .foregroundStyle(.secondary)
+            }
+            HStack(spacing: 12) {
+                Button(action: { Task { await appState.confirmRender() } }) {
+                    Text("Render").frame(minWidth: 120)
+                }
+                .keyboardShortcut(.defaultAction)
+                .controlSize(.large)
+                .buttonStyle(.borderedProminent)
+
+                Button("Cancel") { Task { await appState.cancel() } }
+                    .controlSize(.large)
+                    .keyboardShortcut(.cancelAction)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .topLeading)
     }
 
     private var header: some View {

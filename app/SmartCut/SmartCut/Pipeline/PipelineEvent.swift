@@ -127,6 +127,7 @@ enum PipelineEvent: Decodable, Hashable, Sendable {
     case metadata(durationSec: Double, sizeBytes: Int, codec: String?, width: Int?, height: Int?)
     case silenceFound(count: Int, segments: [Segment])
     case transcript(tokenCount: Int, preview: String)
+    case reviewReady(total: Int)
     case retakeProposed(opId: String, op: RemoveRetakeOp, index: Int, total: Int)
     case retakeDecisionAck(opId: String, action: String)
     case renderProgress(frame: Int?, fps: Double?, speed: Double?, percent: Double?, etaSec: Double?)
@@ -167,6 +168,10 @@ enum PipelineEvent: Decodable, Hashable, Sendable {
     private struct TranscriptPayload: Decodable {
         let tokenCount: Int
         let preview: String
+    }
+
+    private struct ReviewReadyPayload: Decodable {
+        let total: Int
     }
 
     private struct RetakeProposedPayload: Decodable {
@@ -223,6 +228,9 @@ enum PipelineEvent: Decodable, Hashable, Sendable {
         case "transcript":
             let p = try TranscriptPayload(from: decoder)
             self = .transcript(tokenCount: p.tokenCount, preview: p.preview)
+        case "reviewReady":
+            let p = try ReviewReadyPayload(from: decoder)
+            self = .reviewReady(total: p.total)
         case "retakeProposed":
             let p = try RetakeProposedPayload(from: decoder)
             self = .retakeProposed(opId: p.opId, op: p.op, index: p.index, total: p.total)

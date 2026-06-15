@@ -361,7 +361,21 @@ export async function* runSmartcut(
   let finalPlan = plan;
   const allRetakes = retakeOps(plan);
 
-  if (allRetakes.length > 0 && !config.skipApproval && !config.planPath) {
+  if (!config.skipApproval && !config.planPath && allRetakes.length === 0) {
+    // No retakes to review, but still surface a review step so the caller
+    // can confirm before rendering (silence cuts only).
+    yield stageStart("review", "No retakes detected.");
+    const decision = yield { type: "reviewReady", total: 0 };
+    if (!decision || decision.kind === "cancel") {
+      yield stageFail("review", "Cancelled.");
+      return;
+    }
+    yield stageDone("review", "No retakes to review.");
+  } else if (
+    allRetakes.length > 0 &&
+    !config.skipApproval &&
+    !config.planPath
+  ) {
     yield stageStart("review", "Awaiting retake decisions...");
     const approved: RemoveRetakeOp[] = [];
     let cancelled = false;
