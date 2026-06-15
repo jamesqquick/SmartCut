@@ -168,7 +168,10 @@ final class AppState {
     }
 
     /// Dismiss the current error banner and return to the drop screen.
+    /// Rebuilds the sidecar silently so a crashed process is recovered
+    /// without exposing implementation details to the user.
     func dismissError() {
+        rebuildSidecar()
         resetToDrop()
     }
 

@@ -32,12 +32,7 @@ struct ErrorBanner: View {
                         .font(.system(size: 11, weight: .medium))
                         .foregroundStyle(Theme.muted)
 
-                        Button("Restart sidecar") {
-                            appState.restartSidecar()
-                        }
-                        .controlSize(.small)
-
-                        Button("Dismiss") {
+                        Button("Start Over") {
                             appState.dismissError()
                         }
                         .controlSize(.small)
