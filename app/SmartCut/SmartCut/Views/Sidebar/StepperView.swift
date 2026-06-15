@@ -17,7 +17,7 @@ struct StepperView: View {
     ]
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
+        VStack(alignment: .leading, spacing: 4) {
             SidebarSectionHeader("Pipeline")
             ForEach(order, id: \.self) { stage in
                 row(for: stage)
@@ -35,40 +35,36 @@ struct StepperView: View {
             ZStack {
                 Circle()
                     .fill(dotColor(active: isActive, done: isDone, fail: isFail))
-                    .frame(width: 10, height: 10)
+                    .frame(width: 9, height: 9)
                 if isActive {
                     Circle()
-                        .stroke(Color.accentColor.opacity(0.6), lineWidth: 2)
-                        .frame(width: 14, height: 14)
+                        .stroke(Theme.indigo.opacity(0.5), lineWidth: 2)
+                        .frame(width: 15, height: 15)
                 }
             }
             VStack(alignment: .leading, spacing: 2) {
                 Text(label(for: stage, status: status))
                     .font(.system(size: 12))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(isActive || isDone ? Theme.ink : Theme.muted)
                 if let meta = meta(for: stage) {
                     Text(meta)
                         .font(.system(size: 11))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.muted)
                 }
             }
             Spacer(minLength: 0)
         }
-        .padding(.vertical, 6)
+        .padding(.vertical, 9)
         .padding(.horizontal, 10)
-        .background(
-            isActive
-                ? Color(nsColor: .selectedContentBackgroundColor).opacity(0.18)
-                : Color.clear
-        )
-        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+        .background(isActive ? Theme.wash : Color.clear)
+        .clipShape(RoundedRectangle(cornerRadius: Theme.radius, style: .continuous))
     }
 
     private func dotColor(active: Bool, done: Bool, fail: Bool) -> Color {
-        if fail { return .red }
-        if done { return .green }
-        if active { return .accentColor }
-        return Color(nsColor: .separatorColor)
+        if fail { return Theme.danger }
+        if done { return Theme.good }
+        if active { return Theme.indigo }
+        return Theme.borderStrong
     }
 
     private func label(for stage: Stage, status: StageStatus?) -> String {
@@ -117,9 +113,9 @@ struct SidebarSectionHeader: View {
     init(_ title: String) { self.title = title }
     var body: some View {
         Text(title.uppercased())
-            .font(.system(size: 10, weight: .semibold))
-            .tracking(0.6)
-            .foregroundStyle(.secondary)
+            .font(.system(size: 10, weight: .regular))
+            .tracking(0.8)
+            .foregroundStyle(Theme.muted)
             .padding(.bottom, 8)
             .padding(.horizontal, 10)
     }

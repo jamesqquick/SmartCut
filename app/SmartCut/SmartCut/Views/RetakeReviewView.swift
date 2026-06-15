@@ -2,6 +2,7 @@ import SwiftUI
 
 struct RetakeReviewView: View {
     @Environment(AppState.self) private var appState
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         AppShell {
@@ -22,27 +23,27 @@ struct RetakeReviewView: View {
             decisionRow(
                 "Removed",
                 "\(appState.removedCount)",
-                tint: .red
+                tint: Theme.danger
             )
-            decisionRow("Kept", "\(appState.keptCount)", tint: .yellow)
+            decisionRow("Kept", "\(appState.keptCount)", tint: Theme.warn)
             decisionRow("Pending", "\(max(0, appState.retakeTotal - appState.decisions.count))")
             HStack {
                 Text("Est. time saved")
                     .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.muted)
                 Spacer()
                 Text(Formatters.shortDuration(appState.savedSoFar))
                     .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(.green)
+                    .foregroundStyle(Theme.good)
             }
             .padding(.vertical, 2)
             .padding(.horizontal, 10)
         }
     }
 
-    private func decisionRow(_ label: String, _ value: String, tint: Color = .primary) -> some View {
+    private func decisionRow(_ label: String, _ value: String, tint: Color = Theme.ink) -> some View {
         HStack {
-            Text(label).font(.system(size: 11)).foregroundStyle(.secondary)
+            Text(label).font(.system(size: 11)).foregroundStyle(Theme.muted)
             Spacer()
             Text(value)
                 .font(.system(size: 11, weight: .semibold))
@@ -77,23 +78,23 @@ struct RetakeReviewView: View {
 
     private var noRetakesConfirmation: some View {
         VStack(alignment: .leading, spacing: 16) {
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 6) {
                 Text("No retakes detected")
-                    .font(.system(size: 22, weight: .semibold))
+                    .font(.system(size: 28, weight: .light))
+                    .gradientTitle(colorScheme)
                 Text("Only silence cuts will be applied. Render the result?")
                     .font(.system(size: 13))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.bodyText)
             }
             HStack(spacing: 12) {
                 Button(action: { Task { await appState.confirmRender() } }) {
-                    Text("Render").frame(minWidth: 120)
+                    Text("Render").frame(minWidth: 100)
                 }
                 .keyboardShortcut(.defaultAction)
-                .controlSize(.large)
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(.scPrimary)
 
                 Button("Cancel") { Task { await appState.cancel() } }
-                    .controlSize(.large)
+                    .buttonStyle(.scSecondary)
                     .keyboardShortcut(.cancelAction)
             }
         }
@@ -101,16 +102,21 @@ struct RetakeReviewView: View {
     }
 
     private var header: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text("Review proposed cuts")
-                .font(.system(size: 22, weight: .semibold))
+        VStack(alignment: .leading, spacing: 6) {
+            Text("REVIEW")
+                .font(.system(size: 10, weight: .regular))
+                .tracking(0.8)
+                .foregroundStyle(Theme.muted)
+            Text("Proposed cuts")
+                .font(.system(size: 28, weight: .light))
+                .gradientTitle(colorScheme)
             HStack(spacing: 6) {
                 Text("Listen to each cut and choose. Keyboard:")
-                    .foregroundStyle(.secondary)
-                kbd("R"); Text("remove").foregroundStyle(.secondary)
-                kbd("K"); Text("keep").foregroundStyle(.secondary)
-                kbd("A"); Text("approve all").foregroundStyle(.secondary)
-                kbd("Esc"); Text("cancel").foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.muted)
+                kbd("R"); Text("remove").foregroundStyle(Theme.muted)
+                kbd("K"); Text("keep").foregroundStyle(Theme.muted)
+                kbd("A"); Text("approve all").foregroundStyle(Theme.muted)
+                kbd("Esc"); Text("cancel").foregroundStyle(Theme.muted)
             }
             .font(.system(size: 11))
         }
@@ -119,11 +125,12 @@ struct RetakeReviewView: View {
     private func kbd(_ key: String) -> some View {
         Text(key)
             .font(.system(size: 10, weight: .medium, design: .monospaced))
+            .foregroundStyle(Theme.bodyText)
             .padding(.horizontal, 5)
             .padding(.vertical, 1)
             .background(
-                RoundedRectangle(cornerRadius: 3)
-                    .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
+                RoundedRectangle(cornerRadius: Theme.radiusSmall)
+                    .stroke(Theme.borderStrong, lineWidth: 1)
             )
     }
 
@@ -136,12 +143,13 @@ struct RetakeReviewView: View {
         return HStack(spacing: 16) {
             Text("Cut \(oneBasedCurrent) of \(total)")
                 .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(Theme.muted)
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
-                    RoundedRectangle(cornerRadius: 4)
-                        .fill(Color(nsColor: .separatorColor).opacity(0.4))
-                    RoundedRectangle(cornerRadius: 4)
-                        .fill(Color.accentColor)
+                    RoundedRectangle(cornerRadius: Theme.radiusSmall)
+                        .fill(Theme.border)
+                    RoundedRectangle(cornerRadius: Theme.radiusSmall)
+                        .fill(Theme.indigo)
                         .frame(width: max(0, geo.size.width * pct))
                         .animation(.easeOut(duration: 0.2), value: pct)
                 }
@@ -149,7 +157,7 @@ struct RetakeReviewView: View {
             .frame(height: 6)
             Text("\(appState.removedCount) removed")
                 .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(.green)
+                .foregroundStyle(Theme.good)
         }
         .padding(.vertical, 4)
     }
@@ -159,13 +167,17 @@ struct RetakeReviewView: View {
             ProgressView().controlSize(.small)
             Text("Waiting for the next proposal…")
                 .font(.system(size: 13))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Theme.muted)
             Spacer()
         }
         .padding(20)
         .background(
-            RoundedRectangle(cornerRadius: 8)
-                .fill(Color(nsColor: .controlBackgroundColor))
+            RoundedRectangle(cornerRadius: Theme.radius, style: .continuous)
+                .fill(Theme.card)
+                .overlay(
+                    RoundedRectangle(cornerRadius: Theme.radius, style: .continuous)
+                        .stroke(Theme.border, lineWidth: 1)
+                )
         )
     }
 }

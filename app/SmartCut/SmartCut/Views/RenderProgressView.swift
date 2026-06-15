@@ -21,14 +21,14 @@ struct RenderProgressView: View {
             SidebarSectionHeader("Plan summary")
             row("Silence cuts", "\(decisionsSilenceCount)")
             row("Retake cuts", "\(appState.removedCount + approvedRestCount)")
-            row("Removed", Formatters.shortDuration(appState.savedSoFar), tint: .green)
+            row("Removed", Formatters.shortDuration(appState.savedSoFar), tint: Theme.good)
             row("Decisions", "\(appState.decisions.count) / \(appState.retakeTotal)")
         }
     }
 
-    private func row(_ label: String, _ value: String, tint: Color = .primary) -> some View {
+    private func row(_ label: String, _ value: String, tint: Color = Theme.ink) -> some View {
         HStack {
-            Text(label).font(.system(size: 11)).foregroundStyle(.secondary)
+            Text(label).font(.system(size: 11)).foregroundStyle(Theme.muted)
             Spacer()
             Text(value).font(.system(size: 11, weight: .medium)).foregroundStyle(tint)
         }
@@ -66,13 +66,19 @@ struct RenderProgressView: View {
         let percent = stats.percent ?? 0
 
         return VStack(spacing: 16) {
-            Text("⚙️").font(.system(size: 44))
-            Text("Rendering with ffmpeg").font(.system(size: 18, weight: .semibold))
+            Image(systemName: "gearshape.2")
+                .font(.system(size: 38, weight: .light))
+                .foregroundStyle(Theme.indigo)
+                .symbolEffect(.pulse, options: .repeating)
+            Text("Rendering with ffmpeg")
+                .font(.system(size: 24, weight: .light))
+                .foregroundStyle(Theme.ink)
             if let outputPath = outputFilename {
                 HStack(spacing: 4) {
-                    Text("Saving to ").foregroundStyle(.secondary)
+                    Text("Saving to ").foregroundStyle(Theme.muted)
                     Text(outputPath)
                         .font(.system(size: 12, design: .monospaced))
+                        .foregroundStyle(Theme.bodyText)
                 }
                 .font(.system(size: 12))
             }
@@ -88,24 +94,25 @@ struct RenderProgressView: View {
                 }
             }
             .font(.system(size: 12))
-            .foregroundStyle(.secondary)
+            .foregroundStyle(Theme.muted)
 
             statsRow(stats)
                 .padding(.top, 6)
 
             Button("Cancel render") { Task { await appState.cancel() } }
-                .controlSize(.large)
+                .buttonStyle(.scSecondary)
                 .padding(.top, 16)
         }
         .padding(28)
         .frame(maxWidth: .infinity)
         .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(Color(nsColor: .controlBackgroundColor))
+            RoundedRectangle(cornerRadius: Theme.radius, style: .continuous)
+                .fill(Theme.elevated)
                 .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
+                    RoundedRectangle(cornerRadius: Theme.radius, style: .continuous)
+                        .stroke(Theme.border, lineWidth: 1)
                 )
+                .shadow(color: Color(srgb: 0x32325D).opacity(0.12), radius: 24, x: 0, y: 12)
         )
     }
 
@@ -117,10 +124,10 @@ struct RenderProgressView: View {
     private func progressBar(percent: Double) -> some View {
         GeometryReader { geo in
             ZStack(alignment: .leading) {
-                RoundedRectangle(cornerRadius: 3)
-                    .fill(Color(nsColor: .separatorColor).opacity(0.4))
-                RoundedRectangle(cornerRadius: 3)
-                    .fill(Color.accentColor)
+                RoundedRectangle(cornerRadius: Theme.radiusSmall)
+                    .fill(Theme.border)
+                RoundedRectangle(cornerRadius: Theme.radiusSmall)
+                    .fill(Theme.indigo)
                     .frame(width: max(0, geo.size.width * max(0, min(100, percent)) / 100))
                     .animation(.easeOut(duration: 0.2), value: percent)
             }
@@ -139,18 +146,23 @@ struct RenderProgressView: View {
     private func tile(value: String, label: String) -> some View {
         VStack(spacing: 2) {
             Text(value)
-                .font(.system(size: 16, weight: .semibold))
+                .font(.system(size: 18, weight: .regular))
+                .foregroundStyle(Theme.ink)
                 .monospacedDigit()
             Text(label.uppercased())
-                .font(.system(size: 9, weight: .semibold))
-                .tracking(0.5)
-                .foregroundStyle(.secondary)
+                .font(.system(size: 9, weight: .regular))
+                .tracking(0.8)
+                .foregroundStyle(Theme.muted)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 10)
         .background(
-            RoundedRectangle(cornerRadius: 8)
-                .fill(Color(nsColor: .underPageBackgroundColor))
+            RoundedRectangle(cornerRadius: Theme.radius, style: .continuous)
+                .fill(Theme.card)
+                .overlay(
+                    RoundedRectangle(cornerRadius: Theme.radius, style: .continuous)
+                        .stroke(Theme.border, lineWidth: 1)
+                )
         )
     }
 

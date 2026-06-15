@@ -19,7 +19,7 @@ struct ContentView: View {
         .animation(.easeInOut(duration: 0.18), value: appState.errorMessage)
         .environment(appState)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(nsColor: .windowBackgroundColor))
+        .background(Theme.canvas)
         .sheet(
             isPresented: Binding(
                 get: { appState.needsFirstRunConfig },
