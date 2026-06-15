@@ -58,7 +58,11 @@ struct ErrorBanner: View {
         }
         .background(
             RoundedRectangle(cornerRadius: Theme.radius, style: .continuous)
-                .fill(Theme.danger.opacity(0.10))
+                .fill(Theme.elevated)
+                .overlay(
+                    RoundedRectangle(cornerRadius: Theme.radius, style: .continuous)
+                        .fill(Theme.danger.opacity(0.08))
+                )
                 .overlay(
                     RoundedRectangle(cornerRadius: Theme.radius, style: .continuous)
                         .stroke(Theme.danger.opacity(0.35), lineWidth: 1)
