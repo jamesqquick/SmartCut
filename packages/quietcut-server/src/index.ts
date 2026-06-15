@@ -1,20 +1,20 @@
 import * as readline from "node:readline";
 import {
-  runSmartcut,
   type PipelineEvent,
   type RetakeDecision,
+  runSmartcut,
   type SmartcutConfig,
 } from "quietcut-core";
+import { extractClip, extractStitchedClip } from "./audio-preview.js";
+import { getMetadata } from "./metadata.js";
 import {
   parseRpcLine,
   RPC_ERROR,
-  RpcDispatcher,
   RpcDispatchError,
+  RpcDispatcher,
   type RpcNotification,
   type RpcResponse,
 } from "./rpc.js";
-import { getMetadata } from "./metadata.js";
-import { extractClip, extractStitchedClip } from "./audio-preview.js";
 
 const DEFAULT_FILLER_WORDS = new Set([
   "um",
@@ -43,12 +43,12 @@ function logInfo(msg: string): void {
 }
 
 function logError(err: unknown): void {
-  const msg = err instanceof Error ? err.stack ?? err.message : String(err);
+  const msg = err instanceof Error ? (err.stack ?? err.message) : String(err);
   process.stderr.write(`[quietcut-server] ERROR: ${msg}\n`);
 }
 
 function send(message: RpcResponse | RpcNotification): void {
-  process.stdout.write(JSON.stringify(message) + "\n");
+  process.stdout.write(`${JSON.stringify(message)}\n`);
 }
 
 function sendEvent(event: PipelineEvent): void {
@@ -132,10 +132,14 @@ dispatcher.register("getMetadata", async (params) => {
 
 dispatcher.register("extractClip", async (params) => {
   const p = params as ExtractClipParams | undefined;
-  if (!p?.path || typeof p.startSec !== "number" || typeof p.endSec !== "number") {
+  if (
+    !p?.path ||
+    typeof p.startSec !== "number" ||
+    typeof p.endSec !== "number"
+  ) {
     throw new RpcDispatchError(
       RPC_ERROR.invalidParams,
-      "extractClip requires { path, startSec, endSec }"
+      "extractClip requires { path, startSec, endSec }",
     );
   }
   return await extractClip(p.path, p.startSec, p.endSec);
@@ -150,7 +154,7 @@ dispatcher.register("extractStitchedClip", async (params) => {
   ) {
     throw new RpcDispatchError(
       RPC_ERROR.invalidParams,
-      "extractStitchedClip requires { path, removeStart, removeEnd }"
+      "extractStitchedClip requires { path, removeStart, removeEnd }",
     );
   }
   return await extractStitchedClip(p.path, p.removeStart, p.removeEnd, {
@@ -163,7 +167,7 @@ dispatcher.register("start", async (params) => {
   if (activeJob) {
     throw new RpcDispatchError(
       RPC_ERROR.jobAlreadyRunning,
-      "A smartcut job is already running. Send `cancel` first."
+      "A smartcut job is already running. Send `cancel` first.",
     );
   }
 
@@ -171,7 +175,7 @@ dispatcher.register("start", async (params) => {
   if (!p?.input || !p.options?.output) {
     throw new RpcDispatchError(
       RPC_ERROR.invalidParams,
-      "start requires { input, options.output }"
+      "start requires { input, options.output }",
     );
   }
 
@@ -188,14 +192,14 @@ dispatcher.register("decide", async (params) => {
   if (!activeJob) {
     throw new RpcDispatchError(
       RPC_ERROR.jobNotRunning,
-      "No smartcut job is running"
+      "No smartcut job is running",
     );
   }
   const p = params as DecideParams | undefined;
   if (!p?.opId || !p.action) {
     throw new RpcDispatchError(
       RPC_ERROR.invalidParams,
-      "decide requires { opId, action }"
+      "decide requires { opId, action }",
     );
   }
 
@@ -225,7 +229,7 @@ function mapAction(action: DecideParams["action"]): RetakeDecision {
 
 function buildConfig(
   input: string,
-  options: StartParams["options"]
+  options: StartParams["options"],
 ): SmartcutConfig {
   return {
     input,

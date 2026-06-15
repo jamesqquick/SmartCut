@@ -7,14 +7,18 @@ import { formatConfidence, formatDuration, formatTime } from "./preview.js";
  * Render a single retake cut card.
  * Ported from packages/quietcut/src/review.ts.
  */
-export function printCut(op: RemoveRetakeOp, index: number, total: number): void {
+export function printCut(
+  op: RemoveRetakeOp,
+  index: number,
+  total: number,
+): void {
   const dur = op.end - op.start;
   console.log();
   console.log(
     chalk.bold(`Cut ${index + 1}/${total}`) +
       `  ${chalk.dim(formatTime(op.start))} → ${chalk.dim(formatTime(op.end))}` +
       `  ${chalk.red(`-${formatDuration(dur)}`)}` +
-      `  ${chalk.dim("confidence")} ${formatConfidence(op.confidence)}`
+      `  ${chalk.dim("confidence")} ${formatConfidence(op.confidence)}`,
   );
   console.log(`  ${chalk.dim("Remove:")}  ${chalk.red(`"${op.removedText}"`)}`);
   console.log(`  ${chalk.dim("Reason:")}  ${chalk.dim(op.reason)}`);

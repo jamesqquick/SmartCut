@@ -8,7 +8,7 @@ import type { Config, DetectionResult, Segment } from "./types.js";
 export async function detectSilences(
   config: Config,
   duration: number,
-  audioPath?: string
+  audioPath?: string,
 ): Promise<DetectionResult> {
   const { thresholdDb, minSilence } = config;
   const inputFile = audioPath ?? config.input;
@@ -26,7 +26,7 @@ export async function detectSilences(
       "null",
       "-",
     ],
-    { reject: false, all: false }
+    { reject: false, all: false },
   );
 
   const silences = parseSilences(stderr ?? "", duration);

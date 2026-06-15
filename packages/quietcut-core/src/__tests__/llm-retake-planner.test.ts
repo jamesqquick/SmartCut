@@ -1,5 +1,5 @@
-import { describe, it, expect } from "vitest";
 import type Anthropic from "@anthropic-ai/sdk";
+import { describe, expect, it } from "vitest";
 import { planLlmRetakeOps } from "../planners/llm-retake-planner.js";
 import type { Token } from "../types.js";
 
@@ -12,7 +12,10 @@ type Cut = {
 };
 
 /** Fake client returning a queued tool response per call; tracks call count. */
-function queuedClient(responses: Cut[][]): { client: Anthropic; calls: () => number } {
+function queuedClient(responses: Cut[][]): {
+  client: Anthropic;
+  calls: () => number;
+} {
   let i = 0;
   const client = {
     messages: {
@@ -21,7 +24,9 @@ function queuedClient(responses: Cut[][]): { client: Anthropic; calls: () => num
         i++;
         return {
           finalMessage: async () => ({
-            content: [{ type: "tool_use", name: "report_retakes", input: { cuts } }],
+            content: [
+              { type: "tool_use", name: "report_retakes", input: { cuts } },
+            ],
           }),
         };
       },
@@ -31,7 +36,14 @@ function queuedClient(responses: Cut[][]): { client: Anthropic; calls: () => num
 }
 
 function tok(word: string, start: number, end: number): Token {
-  return { word, normalized: word.toLowerCase(), start, end, isFiller: false, leadingSpace: true };
+  return {
+    word,
+    normalized: word.toLowerCase(),
+    start,
+    end,
+    isFiller: false,
+    leadingSpace: true,
+  };
 }
 
 const TOKENS: Token[] = [
@@ -55,7 +67,15 @@ describe("planLlmRetakeOps iteration", () => {
     // Pass 1 cuts the leading "hello world" (0..1, keep 2..3). Pass 2 then runs
     // on the remaining words and finds nothing.
     const { client, calls } = queuedClient([
-      [{ abandonedStartIndex: 0, keepStartIndex: 2, keepEndIndex: 3, reason: "dup", confidence: 90 }],
+      [
+        {
+          abandonedStartIndex: 0,
+          keepStartIndex: 2,
+          keepEndIndex: 3,
+          reason: "dup",
+          confidence: 90,
+        },
+      ],
       [],
     ]);
     const ops = await planLlmRetakeOps(client, "m", TOKENS, [], 15, 2);
@@ -69,11 +89,27 @@ describe("planLlmRetakeOps iteration", () => {
     // middle region; pass 2 (on the remaining tokens) returns a cut that spans
     // across that region, overlapping it. The planner must drop the overlap.
     const dense: Token[] = Array.from({ length: 8 }, (_, i) =>
-      tok(`w${i}`, i * 0.3, i * 0.3 + 0.25)
+      tok(`w${i}`, i * 0.3, i * 0.3 + 0.25),
     );
     const { client, calls } = queuedClient([
-      [{ abandonedStartIndex: 3, keepStartIndex: 4, keepEndIndex: 5, reason: "p1", confidence: 90 }],
-      [{ abandonedStartIndex: 2, keepStartIndex: 5, keepEndIndex: 6, reason: "p2-overlap", confidence: 90 }],
+      [
+        {
+          abandonedStartIndex: 3,
+          keepStartIndex: 4,
+          keepEndIndex: 5,
+          reason: "p1",
+          confidence: 90,
+        },
+      ],
+      [
+        {
+          abandonedStartIndex: 2,
+          keepStartIndex: 5,
+          keepEndIndex: 6,
+          reason: "p2-overlap",
+          confidence: 90,
+        },
+      ],
     ]);
     const ops = await planLlmRetakeOps(client, "m", dense, [], 15, 2);
     expect(calls()).toBe(2); // pass 2 did run
@@ -82,8 +118,24 @@ describe("planLlmRetakeOps iteration", () => {
 
   it("honors passes=1 (single detection call)", async () => {
     const { client, calls } = queuedClient([
-      [{ abandonedStartIndex: 0, keepStartIndex: 2, keepEndIndex: 3, reason: "dup", confidence: 90 }],
-      [{ abandonedStartIndex: 0, keepStartIndex: 1, keepEndIndex: 2, reason: "more", confidence: 90 }],
+      [
+        {
+          abandonedStartIndex: 0,
+          keepStartIndex: 2,
+          keepEndIndex: 3,
+          reason: "dup",
+          confidence: 90,
+        },
+      ],
+      [
+        {
+          abandonedStartIndex: 0,
+          keepStartIndex: 1,
+          keepEndIndex: 2,
+          reason: "more",
+          confidence: 90,
+        },
+      ],
     ]);
     const ops = await planLlmRetakeOps(client, "m", TOKENS, [], 15, 1);
     expect(ops).toHaveLength(1);

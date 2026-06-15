@@ -1,4 +1,4 @@
-import type { Token, RetakeMatch, Segment } from "../types.js";
+import type { RetakeMatch, Segment, Token } from "../types.js";
 
 // ---------------------------------------------------------------------------
 // Internal types
@@ -31,7 +31,7 @@ interface RetakeMatchInternal {
 export function detectRetakes(
   tokens: Token[],
   minWords: number,
-  maxGapSeconds: number
+  maxGapSeconds: number,
 ): RetakeMatch[] {
   const allMatches: RetakeMatchInternal[] = [];
 
@@ -47,7 +47,11 @@ export function detectRetakes(
     // Remove first-take tokens so next pass sees the cleaned-up sequence.
     const toRemove = new Set<number>();
     for (const m of passMatches) {
-      for (let i = m.firstTakeTokenRange[0]; i <= m.firstTakeTokenRange[1]; i++) {
+      for (
+        let i = m.firstTakeTokenRange[0];
+        i <= m.firstTakeTokenRange[1];
+        i++
+      ) {
         toRemove.add(i);
       }
     }
@@ -63,7 +67,7 @@ export function detectRetakes(
       firstTake,
       secondTake,
       cutRegion,
-    })
+    }),
   );
 }
 
@@ -74,13 +78,12 @@ export function detectRetakes(
 function findMatches(
   tokens: Token[],
   minWords: number,
-  maxGapSeconds: number
+  maxGapSeconds: number,
 ): RetakeMatchInternal[] {
   const matches: RetakeMatchInternal[] = [];
   // Track which token indices are already claimed as part of a first-take so
   // we don't double-report overlapping matches.
   const claimed = new Set<number>();
-
 
   const nonFiller = tokens
     .map((t, i) => ({ token: t, idx: i }))
@@ -132,7 +135,10 @@ function findMatches(
       // Skip if any of these are already claimed
       let alreadyClaimed = false;
       for (let k = firstStartIdx; k <= firstEndIdx; k++) {
-        if (claimed.has(k)) { alreadyClaimed = true; break; }
+        if (claimed.has(k)) {
+          alreadyClaimed = true;
+          break;
+        }
       }
       if (alreadyClaimed) continue;
 
@@ -141,8 +147,17 @@ function findMatches(
       // Second take: extend forward up to 5 more non-filler words so the user
       // can see how the sentence continues after the repeated phrase.
       const firstText = buildTakeText(tokens, firstStartIdx, firstEndIdx);
-      const secondExtendedEndIdx = extendForward(nonFiller, bi + matchLen - 1, tokens.length, 5);
-      const secondText = buildTakeText(tokens, secondStartIdx, secondExtendedEndIdx);
+      const secondExtendedEndIdx = extendForward(
+        nonFiller,
+        bi + matchLen - 1,
+        tokens.length,
+        5,
+      );
+      const secondText = buildTakeText(
+        tokens,
+        secondStartIdx,
+        secondExtendedEndIdx,
+      );
       const matchedPhrase = nonFiller
         .slice(ai, ai + matchLen)
         .map(({ token }) => token.word)
@@ -193,7 +208,11 @@ function findMatches(
  * Collect the display text for a take by joining tokens in the given index range,
  * including filler tokens that fall within the range.
  */
-function buildTakeText(tokens: Token[], startIdx: number, endIdx: number): string {
+function buildTakeText(
+  tokens: Token[],
+  startIdx: number,
+  endIdx: number,
+): string {
   return tokens
     .slice(startIdx, endIdx + 1)
     .map((t) => t.word)
@@ -209,7 +228,7 @@ function extendForward(
   nonFiller: Array<{ token: Token; idx: number }>,
   nfIdx: number,
   _tokenCount: number,
-  count: number
+  count: number,
 ): number {
   const target = Math.min(nfIdx + count, nonFiller.length - 1);
   return nonFiller[target].idx;

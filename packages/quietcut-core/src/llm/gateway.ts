@@ -62,7 +62,7 @@ export function resolveGatewayEnv(): GatewayEnv {
     if (!hasAuth) {
       lines.push(
         "",
-        "No auth method found: set ANTHROPIC_API_KEY or CF_AIG_TOKEN."
+        "No auth method found: set ANTHROPIC_API_KEY or CF_AIG_TOKEN.",
       );
     }
     throw new Error(lines.join("\n"));

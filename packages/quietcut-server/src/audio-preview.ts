@@ -1,8 +1,8 @@
-import { execa } from "execa";
+import { randomUUID } from "node:crypto";
 import { mkdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { randomUUID } from "node:crypto";
+import { execa } from "execa";
 
 const PREVIEW_DIR = join(tmpdir(), "smartcut-previews");
 const TTL_MS = 5 * 60 * 1000;
@@ -15,7 +15,7 @@ async function ensureDir(): Promise<void> {
       (err) => {
         dirReady = null;
         throw err;
-      }
+      },
     );
   }
   return dirReady;
@@ -31,13 +31,15 @@ async function ensureDir(): Promise<void> {
 export async function extractClip(
   input: string,
   startSec: number,
-  endSec: number
+  endSec: number,
 ): Promise<{ path: string; durationSec: number }> {
   if (!Number.isFinite(startSec) || !Number.isFinite(endSec)) {
     throw new Error("startSec and endSec must be finite numbers");
   }
   if (endSec <= startSec) {
-    throw new Error(`endSec (${endSec}) must be greater than startSec (${startSec})`);
+    throw new Error(
+      `endSec (${endSec}) must be greater than startSec (${startSec})`,
+    );
   }
 
   await ensureDir();
@@ -63,12 +65,12 @@ export async function extractClip(
       "44100",
       outPath,
     ],
-    { reject: false }
+    { reject: false },
   );
 
   if (result.exitCode !== 0) {
     throw new Error(
-      `ffmpeg extractClip failed (code ${result.exitCode}):\n${result.stderr ?? ""}`
+      `ffmpeg extractClip failed (code ${result.exitCode}):\n${result.stderr ?? ""}`,
     );
   }
 
@@ -100,14 +102,14 @@ export async function extractStitchedClip(
   input: string,
   removeStart: number,
   removeEnd: number,
-  options: { padSec?: number; tailSec?: number } = {}
+  options: { padSec?: number; tailSec?: number } = {},
 ): Promise<{ path: string; durationSec: number }> {
   if (!Number.isFinite(removeStart) || !Number.isFinite(removeEnd)) {
     throw new Error("removeStart and removeEnd must be finite numbers");
   }
   if (removeEnd <= removeStart) {
     throw new Error(
-      `removeEnd (${removeEnd}) must be greater than removeStart (${removeStart})`
+      `removeEnd (${removeEnd}) must be greater than removeStart (${removeStart})`,
     );
   }
 
@@ -147,18 +149,18 @@ export async function extractStitchedClip(
       "44100",
       outPath,
     ],
-    { reject: false }
+    { reject: false },
   );
 
   if (result.exitCode !== 0) {
     throw new Error(
-      `ffmpeg extractStitchedClip failed (code ${result.exitCode}):\n${result.stderr ?? ""}`
+      `ffmpeg extractStitchedClip failed (code ${result.exitCode}):\n${result.stderr ?? ""}`,
     );
   }
 
   scheduleCleanup(outPath);
   return {
     path: outPath,
-    durationSec: (leadEnd - leadStart) + (tailEnd - tailStart),
+    durationSec: leadEnd - leadStart + (tailEnd - tailStart),
   };
 }

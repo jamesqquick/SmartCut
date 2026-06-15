@@ -1,12 +1,12 @@
-import { execa } from "execa";
-import { readFile, writeFile, mkdtemp, rm } from "node:fs/promises";
 import { existsSync } from "node:fs";
-import { join } from "node:path";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { execa } from "execa";
+import type { RetakeConfig, Token } from "../types.js";
 import { extractAudio } from "../utils/ffmpeg.js";
-import { assertWhisperAvailable } from "../utils/whisper.js";
 import { formatTime } from "../utils/time.js";
-import type { Token, RetakeConfig } from "../types.js";
+import { assertWhisperAvailable } from "../utils/whisper.js";
 
 // ---------------------------------------------------------------------------
 // Whisper JSON output shape (whisper.cpp -oj -ojf --dtw <model>)
@@ -35,8 +35,21 @@ interface WhisperOutput {
 // ---------------------------------------------------------------------------
 
 const FILLER_DEFAULTS = new Set([
-  "um", "uh", "like", "so", "okay", "ok", "right", "yeah",
-  "uh-huh", "uhh", "umm", "hmm", "hm", "er", "err",
+  "um",
+  "uh",
+  "like",
+  "so",
+  "okay",
+  "ok",
+  "right",
+  "yeah",
+  "uh-huh",
+  "uhh",
+  "umm",
+  "hmm",
+  "hm",
+  "er",
+  "err",
 ]);
 
 // Whisper special tokens to skip (begin-of-sentence markers, etc.)
@@ -110,10 +123,10 @@ function warnOnCollapsedRuns(collapsed: CollapsedRun[]): void {
   if (collapsed.length === 0) return;
   const biggest = [...collapsed].sort((a, b) => b.count - a.count)[0];
   console.warn(
-    `Note: transcript contained ${collapsed.length} repeated-line loop(s) — likely a whisper mis-transcription, not real speech. Collapsed them.`
+    `Note: transcript contained ${collapsed.length} repeated-line loop(s) — likely a whisper mis-transcription, not real speech. Collapsed them.`,
   );
   console.warn(
-    `  Largest: "${biggest.text}" ×${biggest.count} (${formatTime(biggest.fromSec)}–${formatTime(biggest.toSec)}). Try a larger --whisper-model (e.g. large-v3) for that section.`
+    `  Largest: "${biggest.text}" ×${biggest.count} (${formatTime(biggest.fromSec)}–${formatTime(biggest.toSec)}). Try a larger --whisper-model (e.g. large-v3) for that section.`,
   );
 }
 
@@ -128,7 +141,7 @@ function parseTokens(output: WhisperOutput, fillerWords: Set<string>): Token[] {
   const tokens: Token[] = [];
 
   const { segments, collapsed } = collapseRepeatedSegments(
-    output.transcription
+    output.transcription,
   );
   warnOnCollapsedRuns(collapsed);
 
@@ -165,7 +178,7 @@ function parseTokens(output: WhisperOutput, fillerWords: Set<string>): Token[] {
  */
 export async function loadTokensFromTranscript(
   transcriptPath: string,
-  fillerWords: Set<string>
+  fillerWords: Set<string>,
 ): Promise<Token[]> {
   if (!existsSync(transcriptPath)) {
     throw new Error(`Transcript file not found: ${transcriptPath}`);
@@ -182,11 +195,10 @@ export async function loadTokensFromTranscript(
  */
 export async function transcribeFromAudio(
   wavPath: string,
-  config: Pick<RetakeConfig, 'model' | 'saveTranscriptPath' | 'fillerWords'>
+  config: Pick<RetakeConfig, "model" | "saveTranscriptPath" | "fillerWords">,
 ): Promise<Token[]> {
-  const fillerWords = config.fillerWords.size > 0
-    ? config.fillerWords
-    : FILLER_DEFAULTS;
+  const fillerWords =
+    config.fillerWords.size > 0 ? config.fillerWords : FILLER_DEFAULTS;
 
   const whisperBin = await assertWhisperAvailable();
   const modelPath = resolveModelPath(config.model);
@@ -197,18 +209,24 @@ export async function transcribeFromAudio(
 
   try {
     const args = [
-      "-m", modelPath,
-      "-f", wavPath,
+      "-m",
+      modelPath,
+      "-f",
+      wavPath,
       "-oj",
       "-ojf",
-      "-of", outBase,
+      "-of",
+      outBase,
       "-nfa",
-      "--dtw", dtwSize,
-      "-l", "auto",
+      "--dtw",
+      dtwSize,
+      "-l",
+      "auto",
       // Disable cross-segment text conditioning. Carrying prior decoded text
       // forward is the main trigger for whisper.cpp hallucination loops (one
       // sentence repeating for minutes); -mc 0 makes each window decode fresh.
-      "-mc", "0",
+      "-mc",
+      "0",
       "-np",
     ];
 
@@ -223,7 +241,7 @@ export async function transcribeFromAudio(
           `Model:     ${modelPath}\n` +
           `DTW size:  ${dtwSize}\n` +
           `Exit code: ${result.exitCode ?? "(undefined — binary may not have run)"}\n` +
-          `stderr:\n${stderrSnippet || "(empty)"}`
+          `stderr:\n${stderrSnippet || "(empty)"}`,
       );
     }
 
@@ -252,9 +270,8 @@ export async function transcribeFromAudio(
  * whisper JSON is written there after transcribing.
  */
 export async function transcribe(config: RetakeConfig): Promise<Token[]> {
-  const fillerWords = config.fillerWords.size > 0
-    ? config.fillerWords
-    : FILLER_DEFAULTS;
+  const fillerWords =
+    config.fillerWords.size > 0 ? config.fillerWords : FILLER_DEFAULTS;
 
   // --- Re-use existing transcript ---
   if (config.transcriptPath) {
@@ -287,7 +304,11 @@ export async function transcribe(config: RetakeConfig): Promise<Token[]> {
  */
 function resolveModelPath(model: string): string {
   // Already an explicit path
-  if (model.startsWith("/") || model.startsWith("./") || model.startsWith("../")) {
+  if (
+    model.startsWith("/") ||
+    model.startsWith("./") ||
+    model.startsWith("../")
+  ) {
     return model;
   }
 
@@ -395,7 +416,10 @@ function globHomebrewDirs(): string[] {
  *   "large-v2"          -> "large.v2"
  *   "base.en"           -> "base"
  */
-export function extractModelSize(resolvedPath: string, configModel: string): string {
+export function extractModelSize(
+  resolvedPath: string,
+  configModel: string,
+): string {
   const source = resolvedPath !== configModel ? resolvedPath : configModel;
   const name = source.split("/").pop() ?? source; // basename
 
@@ -413,8 +437,13 @@ export function extractModelSize(resolvedPath: string, configModel: string): str
   }
 
   const known = [
-    "tiny", "base", "small", "medium",
-    "large.v1", "large.v2", "large.v3",
+    "tiny",
+    "base",
+    "small",
+    "medium",
+    "large.v1",
+    "large.v2",
+    "large.v3",
   ];
   if (known.includes(size)) return size;
 

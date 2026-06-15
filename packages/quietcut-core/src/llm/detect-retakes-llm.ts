@@ -1,13 +1,13 @@
 import type Anthropic from "@anthropic-ai/sdk";
-import type { Token, Segment } from "../types.js";
 import { normalizeWord } from "../retake/transcribe.js";
+import type { Segment, Token } from "../types.js";
 import {
+  type RetakeCut,
+  RetakeValidationError,
   retakeToolInputSchema,
   retakeToolJsonSchema,
-  validateRetakeCuts,
   sanitizeRetakeCuts,
-  RetakeValidationError,
-  type RetakeCut,
+  validateRetakeCuts,
 } from "./schema.js";
 
 // ---------------------------------------------------------------------------
@@ -185,14 +185,17 @@ function refineAbandonedStart(
   tokens: Token[],
   modelStart: number,
   keepStart: number,
-  keepEnd: number
+  keepEnd: number,
 ): number {
   const maxL = Math.min(keepStart, keepEnd - keepStart + 1);
   let best = keepStart; // no extension found
   for (let L = maxL; L >= 1; L--) {
     let matches = true;
     for (let j = 0; j < L; j++) {
-      if (tokens[keepStart - L + j].normalized !== tokens[keepStart + j].normalized) {
+      if (
+        tokens[keepStart - L + j].normalized !==
+        tokens[keepStart + j].normalized
+      ) {
         matches = false;
         break;
       }
@@ -228,7 +231,7 @@ function extractToolInput(message: Anthropic.Message): unknown {
 async function requestRawCuts(
   client: Anthropic,
   model: string,
-  messages: Anthropic.MessageParam[]
+  messages: Anthropic.MessageParam[],
 ): Promise<RetakeCut[] | null> {
   // Adaptive thinking (Opus 4.8 / Sonnet 4.6) materially improves this
   // reasoning-heavy task, but it forbids forced tool_choice and a fixed
@@ -246,7 +249,8 @@ async function requestRawCuts(
         name: TOOL_NAME,
         description:
           "Report every re-recorded take detected in the transcript so the earlier attempts can be cut.",
-        input_schema: retakeToolJsonSchema as unknown as Anthropic.Tool.InputSchema,
+        input_schema:
+          retakeToolJsonSchema as unknown as Anthropic.Tool.InputSchema,
       },
     ],
     tool_choice: { type: "auto" },
@@ -268,7 +272,7 @@ async function requestRawCuts(
     throw new RetakeValidationError(
       `Tool input failed schema validation: ${parsed.error.issues
         .map((i) => `${i.path.join(".")}: ${i.message}`)
-        .join("; ")}`
+        .join("; ")}`,
     );
   }
 
@@ -289,7 +293,7 @@ export async function detectRetakesLLM(
   client: Anthropic,
   model: string,
   rawTokens: Token[],
-  maxRetakeRatio: number = DEFAULT_MAX_RETAKE_RATIO
+  maxRetakeRatio: number = DEFAULT_MAX_RETAKE_RATIO,
 ): Promise<LlmRetake[]> {
   if (rawTokens.length === 0) return [];
 
@@ -327,7 +331,9 @@ export async function detectRetakesLLM(
       {
         role: "user",
         content:
-          (firstError ? `Your previous tool call was invalid: ${firstError}\n` : "") +
+          (firstError
+            ? `Your previous tool call was invalid: ${firstError}\n`
+            : "") +
           `You must call the report_retakes tool. Token indices must be within 0..${tokens.length - 1}, with abandonedStartIndex < keepStartIndex <= keepEndIndex, and cuts must be disjoint. ` +
           `If there are genuinely no retakes, call report_retakes with an empty "cuts" array.`,
       },
@@ -347,7 +353,7 @@ export async function detectRetakesLLM(
   const { cuts, dropped } = sanitizeRetakeCuts(rawCuts, tokens.length);
   if (dropped.length > 0) {
     console.warn(
-      `Note: dropped ${dropped.length} invalid retake cut(s) the model returned:`
+      `Note: dropped ${dropped.length} invalid retake cut(s) the model returned:`,
     );
     for (const d of dropped) console.warn(`  - ${d.reason}`);
   }
@@ -362,7 +368,7 @@ export async function detectRetakesLLM(
       tokens,
       c.abandonedStartIndex,
       c.keepStartIndex,
-      c.keepEndIndex
+      c.keepEndIndex,
     );
 
     // Delete everything from the start of the abandoned take up to the start of
@@ -400,15 +406,16 @@ export async function detectRetakesLLM(
 
     // Confidence: the model's self-report, capped by how lopsided the cut is so
     // a suspicious delete/keep ratio can't present as highly confident.
-    const confidence = Math.min(
-      c.confidence ?? 50,
-      ratioConfidenceCap(ratio)
-    );
+    const confidence = Math.min(c.confidence ?? 50, ratioConfidenceCap(ratio));
 
     retakes.push({
       cutRegion: { start, end },
       reason: c.reason,
-      removedText: reconstructText(tokens, abandonedStart, c.keepStartIndex - 1),
+      removedText: reconstructText(
+        tokens,
+        abandonedStart,
+        c.keepStartIndex - 1,
+      ),
       keptText: reconstructText(tokens, c.keepStartIndex, c.keepEndIndex),
       contextBefore: sentenceBefore(tokens, abandonedStart - 1),
       contextAfter: sentenceAfter(tokens, c.keepEndIndex + 1),
@@ -418,12 +425,12 @@ export async function detectRetakesLLM(
 
   if (overlongDropped > 0) {
     console.warn(
-      `Note: dropped ${overlongDropped} cut(s) with an implausible delete-to-keep ratio (> ${maxRetakeRatio}:1) — likely a mis-paired recurring phrase or a looping transcript. Raise --max-retake-ratio to keep them.`
+      `Note: dropped ${overlongDropped} cut(s) with an implausible delete-to-keep ratio (> ${maxRetakeRatio}:1) — likely a mis-paired recurring phrase or a looping transcript. Raise --max-retake-ratio to keep them.`,
     );
   }
   if (sparseDropped > 0) {
     console.warn(
-      `Note: dropped ${sparseDropped} cut(s) spanning several seconds with almost no words — likely audio whisper couldn't transcribe, not a retake. Left in place to avoid deleting real content.`
+      `Note: dropped ${sparseDropped} cut(s) spanning several seconds with almost no words — likely audio whisper couldn't transcribe, not a retake. Left in place to avoid deleting real content.`,
     );
   }
 

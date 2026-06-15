@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import { snapRetakeCutRegion } from "../retake/snap.js";
 import type { Segment } from "../types.js";
 
@@ -21,7 +21,7 @@ describe("snapRetakeCutRegion", () => {
     // so the end is clamped to the original onset (6.60). The start still snaps.
     const snapped = snapRetakeCutRegion(
       { start: 5.14, end: 6.6 },
-      REAL_SILENCES
+      REAL_SILENCES,
     );
     expect(snapped.start).toBeCloseTo(5.12775, 5);
     expect(snapped.end).toBeCloseTo(6.6, 5);

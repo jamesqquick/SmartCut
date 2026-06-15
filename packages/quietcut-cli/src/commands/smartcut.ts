@@ -1,20 +1,20 @@
-import { Command } from "commander";
-import chalk from "chalk";
-import ora, { type Ora } from "ora";
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
+import chalk from "chalk";
+import { Command } from "commander";
+import ora, { type Ora } from "ora";
 import {
   defaultSmartcutOutput,
+  type PipelineEvent,
   planToKeepSegments,
+  type RetakeDecision,
   retakeOps,
   runSmartcut,
-  type PipelineEvent,
-  type RetakeDecision,
   type SmartcutConfig,
   type Stage,
 } from "quietcut-core";
-import { printCut, promptRetakeDecision } from "./review.js";
 import { formatDuration, printSmartcutPreview } from "./preview.js";
+import { printCut, promptRetakeDecision } from "./review.js";
 
 const DEFAULT_FILLER_WORDS = new Set([
   "um",
@@ -52,7 +52,7 @@ const STAGE_LABELS: Record<Stage, string> = {
 
 export const smartcutCommand = new Command("smartcut")
   .description(
-    "AI-driven cut: remove silence and contextual retakes (LLM via Cloudflare AI Gateway)"
+    "AI-driven cut: remove silence and contextual retakes (LLM via Cloudflare AI Gateway)",
   )
   .argument("<input>", "Input video file")
   .option("-o, --output <path>", "Output file (default: <input>-smart.<ext>)")
@@ -61,45 +61,53 @@ export const smartcutCommand = new Command("smartcut")
   .option(
     "-d, --min-silence <seconds>",
     "Minimum silence duration to cut (seconds)",
-    "0.6"
+    "0.6",
   )
   // llm options
   .option("--model <name>", "Claude model id", DEFAULT_MODEL)
   .option(
     "--max-retake-ratio <n>",
     "Drop cuts whose deleted-to-kept word ratio exceeds this (guards against mis-paired recurring phrases and looping transcripts)",
-    "15"
+    "15",
   )
   .option(
     "--passes <n>",
     "Retake detection passes; later passes re-clean what earlier passes left behind (1 = single pass)",
-    "2"
+    "2",
   )
   .option(
     "--whisper-model <name>",
     "Whisper model for transcription",
-    "base.en"
+    "base.en",
   )
   .option(
     "--transcript <path>",
-    "Reuse an existing whisper JSON transcript (skips transcription)"
+    "Reuse an existing whisper JSON transcript (skips transcription)",
   )
   .option(
     "--save-transcript <path>",
-    "Write the whisper JSON transcript to this path after transcribing"
+    "Write the whisper JSON transcript to this path after transcribing",
   )
   .option(
     "--log-transcript",
-    "Print the full transcript text to the console before detecting retakes"
+    "Print the full transcript text to the console before detecting retakes",
   )
   .option(
     "--plan <path>",
-    "Load a saved EditPlan JSON and skip detection (re-render)"
+    "Load a saved EditPlan JSON and skip detection (re-render)",
   )
   .option("--save-plan <path>", "Write the EditPlan JSON after detection")
   // shared options
-  .option("-i, --lead-in <ms>", "Padding to keep before each segment (ms)", "300")
-  .option("-O, --tail-out <ms>", "Padding to keep after each segment (ms)", "300")
+  .option(
+    "-i, --lead-in <ms>",
+    "Padding to keep before each segment (ms)",
+    "300",
+  )
+  .option(
+    "-O, --tail-out <ms>",
+    "Padding to keep after each segment (ms)",
+    "300",
+  )
   .option("-y, --yes", "Skip approval/review and render immediately")
   .option("--dry-run", "Print the plan and exit without rendering")
   .option("--crf <n>", "x264 CRF quality (lower = better)", "18")
@@ -165,7 +173,7 @@ export const smartcutCommand = new Command("smartcut")
     function finishSpinner(
       stage: Stage,
       kind: "succeed" | "fail",
-      message: string
+      message: string,
     ): void {
       if (currentSpinner && currentSpinnerStage === stage) {
         currentSpinner[kind](message);
@@ -176,7 +184,7 @@ export const smartcutCommand = new Command("smartcut")
         console.log(
           kind === "succeed"
             ? chalk.green(`✔ ${message}`)
-            : chalk.red(`✖ ${message}`)
+            : chalk.red(`✖ ${message}`),
         );
       }
     }
@@ -208,7 +216,7 @@ export const smartcutCommand = new Command("smartcut")
     // Event handlers (closure over local state).
     // -------------------------------------------------------------------------
     async function handleEvent(
-      event: PipelineEvent
+      event: PipelineEvent,
     ): Promise<RetakeDecision | void> {
       switch (event.type) {
         case "stage": {
@@ -222,9 +230,17 @@ export const smartcutCommand = new Command("smartcut")
             // with whisper (model: base.en)...") to keep parity with legacy.
             ensureSpinner(event.stage, event.message ?? `${label}...`);
           } else if (event.status === "done") {
-            finishSpinner(event.stage, "succeed", event.message ?? `${label} done.`);
+            finishSpinner(
+              event.stage,
+              "succeed",
+              event.message ?? `${label} done.`,
+            );
           } else {
-            finishSpinner(event.stage, "fail", event.message ?? `${label} failed.`);
+            finishSpinner(
+              event.stage,
+              "fail",
+              event.message ?? `${label} failed.`,
+            );
           }
           return;
         }
@@ -291,31 +307,35 @@ export const smartcutCommand = new Command("smartcut")
           const keep = planToKeepSegments(
             event.plan,
             config.leadInMs,
-            config.tailOutMs
+            config.tailOutMs,
           );
           printSmartcutPreview(event.plan, keep, event.plan.duration, input);
 
           if (event.output === "") {
-            console.log(chalk.dim("--dry-run specified. Exiting without rendering."));
+            console.log(
+              chalk.dim("--dry-run specified. Exiting without rendering."),
+            );
             return;
           }
 
           const elapsed = event.elapsedSec.toFixed(1);
           const silenceOps = event.plan.operations.filter(
-            (op) => op.type === "removeSilence"
+            (op) => op.type === "removeSilence",
           ).length;
           const retakeOpsCount = retakeOps(event.plan).length;
 
           console.log();
           console.log(chalk.bold("Done!"));
           console.log(`  ${chalk.dim("Input:")}    ${input}`);
-          console.log(`  ${chalk.dim("Output:")}   ${chalk.cyan(event.output)}`);
           console.log(
-            `  ${chalk.dim("Silence:")}  ${silenceOps} region${silenceOps !== 1 ? "s" : ""} cut`
+            `  ${chalk.dim("Output:")}   ${chalk.cyan(event.output)}`,
+          );
+          console.log(
+            `  ${chalk.dim("Silence:")}  ${silenceOps} region${silenceOps !== 1 ? "s" : ""} cut`,
           );
           console.log(`  ${chalk.dim("Retakes:")}  ${retakeOpsCount} cut`);
           console.log(
-            `  ${chalk.dim("Saved:")}    ${chalk.yellow(formatDuration(event.savedSec))} (${event.savedPercent.toFixed(1)}%)`
+            `  ${chalk.dim("Saved:")}    ${chalk.yellow(formatDuration(event.savedSec))} (${event.savedPercent.toFixed(1)}%)`,
           );
           console.log(`  ${chalk.dim("Time:")}     ${elapsed}s`);
           console.log();
@@ -336,4 +356,3 @@ export const smartcutCommand = new Command("smartcut")
       }
     }
   });
-

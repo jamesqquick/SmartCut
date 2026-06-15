@@ -1,10 +1,10 @@
-import { spawn, type ChildProcess } from "node:child_process";
-import { createInterface, type Interface } from "node:readline";
+import { type ChildProcess, spawn } from "node:child_process";
 import { existsSync, statSync } from "node:fs";
 import { unlink } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { createInterface, type Interface } from "node:readline";
 import type { PipelineEvent } from "quietcut-core";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 // Walk up from cwd looking for a .env so the pipeline test can pick up
 // Cloudflare AI Gateway creds the same way the CLI does.
@@ -50,15 +50,10 @@ class SidecarHarness {
   constructor(serverEntry: string) {
     // Use tsx so we can run against the source files directly without
     // requiring a fresh build between test iterations.
-    this.child = spawn(
-      "node",
-      [
-        "--import",
-        "tsx",
-        serverEntry,
-      ],
-      { stdio: ["pipe", "pipe", "pipe"], env: process.env }
-    );
+    this.child = spawn("node", ["--import", "tsx", serverEntry], {
+      stdio: ["pipe", "pipe", "pipe"],
+      env: process.env,
+    });
 
     this.child.on("exit", () => {
       this.exited = true;
@@ -69,7 +64,10 @@ class SidecarHarness {
       this.pending.clear();
     });
 
-    this.rl = createInterface({ input: this.child.stdout!, crlfDelay: Infinity });
+    this.rl = createInterface({
+      input: this.child.stdout!,
+      crlfDelay: Infinity,
+    });
     this.rl.on("line", (line) => this.handleLine(line));
 
     this.child.stderr!.on("data", (chunk: Buffer) => {
@@ -85,7 +83,7 @@ class SidecarHarness {
       if (this.stderrBuffer.includes("[quietcut-server] ready")) return;
       if (this.exited) {
         throw new Error(
-          `sidecar exited before ready:\n${this.stderrBuffer || "(no stderr)"}`
+          `sidecar exited before ready:\n${this.stderrBuffer || "(no stderr)"}`,
         );
       }
       await new Promise((r) => setTimeout(r, 20));
@@ -102,7 +100,7 @@ class SidecarHarness {
       this.pending.set(id, { resolve: resolveP, reject: rejectP });
     });
     this.child.stdin!.write(
-      JSON.stringify({ jsonrpc: "2.0", id, method, params }) + "\n"
+      `${JSON.stringify({ jsonrpc: "2.0", id, method, params })}\n`,
     );
     return promise;
   }
@@ -111,7 +109,10 @@ class SidecarHarness {
    * Resolve once an event satisfying `predicate` arrives. Consumes the
    * matched event so subsequent calls won't see it again.
    */
-  waitForEvent(predicate: EventWaiter, timeoutMs = 60_000): Promise<PipelineEvent> {
+  waitForEvent(
+    predicate: EventWaiter,
+    timeoutMs = 60_000,
+  ): Promise<PipelineEvent> {
     const idx = this.events.findIndex(predicate);
     if (idx !== -1) {
       const [event] = this.events.splice(idx, 1);
@@ -212,42 +213,49 @@ describe("RPC primitives", () => {
 
   it("validates getMetadata params", async () => {
     await expect(harness.request("getMetadata", {})).rejects.toThrow(
-      /missing params.path/
+      /missing params.path/,
     );
   });
 });
 
 describe("media handlers", () => {
   const FIXTURE =
-    process.env.SMARTCUT_FIXTURE ?? `${process.env.HOME}/Movies/2026-06-11 11-44-01.mov`;
+    process.env.SMARTCUT_FIXTURE ??
+    `${process.env.HOME}/Movies/2026-06-11 11-44-01.mov`;
   const hasFixture = existsSync(FIXTURE);
 
-  it.skipIf(!hasFixture)("getMetadata reads duration + dimensions", async () => {
-    const md = (await harness.request("getMetadata", { path: FIXTURE })) as {
-      durationSec: number;
-      sizeBytes: number;
-      codec?: string;
-      width?: number;
-      height?: number;
-    };
-    expect(md.durationSec).toBeGreaterThan(0);
-    expect(md.sizeBytes).toBe(statSync(FIXTURE).size);
-    expect(md.codec).toBeTypeOf("string");
-    expect(md.width).toBeGreaterThan(0);
-    expect(md.height).toBeGreaterThan(0);
-  });
+  it.skipIf(!hasFixture)(
+    "getMetadata reads duration + dimensions",
+    async () => {
+      const md = (await harness.request("getMetadata", { path: FIXTURE })) as {
+        durationSec: number;
+        sizeBytes: number;
+        codec?: string;
+        width?: number;
+        height?: number;
+      };
+      expect(md.durationSec).toBeGreaterThan(0);
+      expect(md.sizeBytes).toBe(statSync(FIXTURE).size);
+      expect(md.codec).toBeTypeOf("string");
+      expect(md.width).toBeGreaterThan(0);
+      expect(md.height).toBeGreaterThan(0);
+    },
+  );
 
-  it.skipIf(!hasFixture)("extractClip writes a wav at the expected duration", async () => {
-    const result = (await harness.request("extractClip", {
-      path: FIXTURE,
-      startSec: 5,
-      endSec: 7.5,
-    })) as { path: string; durationSec: number };
-    expect(result.durationSec).toBeCloseTo(2.5, 2);
-    expect(existsSync(result.path)).toBe(true);
-    // Clean up immediately rather than waiting on the 5-min TTL.
-    await unlink(result.path).catch(() => undefined);
-  });
+  it.skipIf(!hasFixture)(
+    "extractClip writes a wav at the expected duration",
+    async () => {
+      const result = (await harness.request("extractClip", {
+        path: FIXTURE,
+        startSec: 5,
+        endSec: 7.5,
+      })) as { path: string; durationSec: number };
+      expect(result.durationSec).toBeCloseTo(2.5, 2);
+      expect(existsSync(result.path)).toBe(true);
+      // Clean up immediately rather than waiting on the 5-min TTL.
+      await unlink(result.path).catch(() => undefined);
+    },
+  );
 
   it("extractClip rejects bad ranges", async () => {
     await expect(
@@ -255,18 +263,19 @@ describe("media handlers", () => {
         path: "/does/not/matter.mov",
         startSec: 10,
         endSec: 5,
-      })
+      }),
     ).rejects.toThrow(/must be greater than/);
   });
 });
 
 describe("pipeline", () => {
   const FIXTURE =
-    process.env.SMARTCUT_FIXTURE ?? `${process.env.HOME}/Movies/2026-06-11 11-44-01.mov`;
+    process.env.SMARTCUT_FIXTURE ??
+    `${process.env.HOME}/Movies/2026-06-11 11-44-01.mov`;
   const hasFixture = existsSync(FIXTURE);
   const hasLlmCreds = Boolean(
     process.env.CLOUDFLARE_ACCOUNT_ID &&
-      (process.env.CF_AIG_TOKEN || process.env.ANTHROPIC_API_KEY)
+      (process.env.CF_AIG_TOKEN || process.env.ANTHROPIC_API_KEY),
   );
   const shouldRun = hasFixture && hasLlmCreds;
 
@@ -288,12 +297,16 @@ describe("pipeline", () => {
 
       // Confirm key stage events arrive in order.
       const probeStart = await harness.waitForEvent(
-        (e) => e.type === "stage" && e.stage === "probe" && e.status === "start"
+        (e) =>
+          e.type === "stage" && e.stage === "probe" && e.status === "start",
       );
       expect(probeStart.type).toBe("stage");
 
       await harness.waitForEvent(
-        (e) => e.type === "stage" && e.stage === "extract-audio" && e.status === "done"
+        (e) =>
+          e.type === "stage" &&
+          e.stage === "extract-audio" &&
+          e.status === "done",
       );
 
       await harness.waitForEvent((e) => e.type === "transcript");
@@ -303,7 +316,7 @@ describe("pipeline", () => {
       // for whisper + claude.
       const done = await harness.waitForEvent(
         (e) => e.type === "done",
-        180_000
+        180_000,
       );
       expect(done.type).toBe("done");
       if (done.type === "done") {
@@ -313,6 +326,6 @@ describe("pipeline", () => {
 
       await unlink(planPath).catch(() => undefined);
     },
-    240_000
+    240_000,
   );
 });

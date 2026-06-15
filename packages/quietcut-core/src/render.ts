@@ -36,16 +36,16 @@ function buildTrimConcatFilter(segments: Segment[]): string {
 
   segments.forEach((seg, i) => {
     parts.push(
-      `[0:v]trim=start=${seg.start}:end=${seg.end},setpts=PTS-STARTPTS[v${i}]`
+      `[0:v]trim=start=${seg.start}:end=${seg.end},setpts=PTS-STARTPTS[v${i}]`,
     );
     parts.push(
-      `[0:a]atrim=start=${seg.start}:end=${seg.end},asetpts=PTS-STARTPTS[a${i}]`
+      `[0:a]atrim=start=${seg.start}:end=${seg.end},asetpts=PTS-STARTPTS[a${i}]`,
     );
     concatInputs.push(`[v${i}][a${i}]`);
   });
 
   parts.push(
-    `${concatInputs.join("")}concat=n=${segments.length}:v=1:a=1[v][a]`
+    `${concatInputs.join("")}concat=n=${segments.length}:v=1:a=1[v][a]`,
   );
 
   return parts.join(";");
@@ -65,7 +65,7 @@ function buildTrimConcatFilter(segments: Segment[]): string {
  */
 function parseProgressBlock(
   text: string,
-  totalKeptMs: number
+  totalKeptMs: number,
 ): RenderProgress | undefined {
   const fields: Record<string, string> = {};
   for (const line of text.split("\n")) {
@@ -95,7 +95,10 @@ function parseProgressBlock(
     const microseconds = parseInt(fields.out_time_ms, 10);
     if (Number.isFinite(microseconds)) {
       const elapsedMs = microseconds / 1000;
-      const percent = Math.max(0, Math.min(100, (elapsedMs / totalKeptMs) * 100));
+      const percent = Math.max(
+        0,
+        Math.min(100, (elapsedMs / totalKeptMs) * 100),
+      );
       out.percent = percent;
       if (out.speed && out.speed > 0) {
         const remainingMs = Math.max(0, totalKeptMs - elapsedMs);
@@ -116,14 +119,14 @@ function parseProgressBlock(
 export async function render(
   config: Config,
   keep: Segment[],
-  options: RenderOptions = {}
+  options: RenderOptions = {},
 ): Promise<void> {
   const { input, output, crf, preset } = config;
   const filterComplex = buildTrimConcatFilter(keep);
 
   const totalKeptMs = keep.reduce(
     (acc, seg) => acc + (seg.end - seg.start) * 1000,
-    0
+    0,
   );
 
   const args = [
@@ -169,14 +172,15 @@ export async function render(
       buffer += chunk.toString();
       // ffmpeg flushes a block whenever it writes `progress=continue` or
       // `progress=end`. Split on that boundary to parse complete blocks.
-      let idx: number;
-      while ((idx = buffer.indexOf("progress=")) !== -1) {
+      let idx = buffer.indexOf("progress=");
+      while (idx !== -1) {
         const nlAfter = buffer.indexOf("\n", idx);
         if (nlAfter === -1) break;
         const block = buffer.slice(0, nlAfter);
         buffer = buffer.slice(nlAfter + 1);
         const update = parseProgressBlock(block, totalKeptMs);
-        if (update) options.onProgress!(update);
+        if (update) options.onProgress?.(update);
+        idx = buffer.indexOf("progress=");
       }
     });
   }
@@ -185,6 +189,8 @@ export async function render(
 
   if (result.exitCode !== 0) {
     const errOutput = result.stderr ?? "";
-    throw new Error(`ffmpeg exited with code ${result.exitCode}:\n${errOutput}`);
+    throw new Error(
+      `ffmpeg exited with code ${result.exitCode}:\n${errOutput}`,
+    );
   }
 }

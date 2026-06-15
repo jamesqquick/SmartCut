@@ -1,7 +1,7 @@
-import { execa, ExecaError } from "execa";
 import { mkdtemp, rm } from "node:fs/promises";
-import { join } from "node:path";
 import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { execa } from "execa";
 
 /**
  * Verify ffmpeg and ffprobe are available on PATH.
@@ -13,7 +13,7 @@ export async function assertFfmpegAvailable(): Promise<void> {
       await execa(bin, ["-version"], { reject: true });
     } catch {
       throw new Error(
-        `"${bin}" not found on PATH. Install ffmpeg and make sure it is accessible:\n  https://ffmpeg.org/download.html`
+        `"${bin}" not found on PATH. Install ffmpeg and make sure it is accessible:\n  https://ffmpeg.org/download.html`,
       );
     }
   }
@@ -33,7 +33,7 @@ export async function getDuration(file: string): Promise<number> {
     file,
   ]);
   const duration = parseFloat(stdout.trim());
-  if (isNaN(duration) || duration <= 0) {
+  if (Number.isNaN(duration) || duration <= 0) {
     throw new Error(`Could not determine duration of "${file}".`);
   }
   return duration;
@@ -48,7 +48,7 @@ export async function getDuration(file: string): Promise<number> {
 export async function runFfmpeg(
   args: string[],
   onProgress?: (progress: number) => void,
-  totalDurationMs?: number
+  totalDurationMs?: number,
 ): Promise<void> {
   const proc = execa("ffmpeg", args, {
     reject: false,
@@ -79,7 +79,9 @@ export async function runFfmpeg(
 
   if (result.exitCode !== 0) {
     const errOutput = result.stderr ?? result.all ?? "";
-    throw new Error(`ffmpeg exited with code ${result.exitCode}:\n${errOutput}`);
+    throw new Error(
+      `ffmpeg exited with code ${result.exitCode}:\n${errOutput}`,
+    );
   }
 }
 
@@ -88,7 +90,7 @@ export async function runFfmpeg(
  * Returns the path to the WAV file and a cleanup function.
  */
 export async function extractAudio(
-  input: string
+  input: string,
 ): Promise<{ wavPath: string; cleanup: () => Promise<void> }> {
   const tmpDir = await mkdtemp(join(tmpdir(), "quietcut-"));
   const wavPath = join(tmpDir, "audio.wav");
@@ -108,13 +110,13 @@ export async function extractAudio(
       "pcm_s16le",
       wavPath,
     ],
-    { reject: false }
+    { reject: false },
   );
 
   if (result.exitCode !== 0) {
     await rm(tmpDir, { recursive: true, force: true });
     throw new Error(
-      `ffmpeg audio extraction failed (code ${result.exitCode}):\n${result.stderr}`
+      `ffmpeg audio extraction failed (code ${result.exitCode}):\n${result.stderr}`,
     );
   }
 

@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import { mergeSubwordTokens } from "../llm/detect-retakes-llm.js";
 import type { Token } from "../types.js";
 
@@ -6,7 +6,7 @@ function tok(
   word: string,
   start: number,
   end: number,
-  leadingSpace: boolean
+  leadingSpace: boolean,
 ): Token {
   return {
     word,
