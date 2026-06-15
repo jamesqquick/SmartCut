@@ -167,9 +167,9 @@ final class AppState {
         appendLog(.info, "Sidecar restarted")
     }
 
-    /// Dismiss the current error banner without restarting.
+    /// Dismiss the current error banner and return to the drop screen.
     func dismissError() {
-        errorMessage = nil
+        resetToDrop()
     }
 
     private func rebuildSidecar() {
@@ -274,6 +274,7 @@ final class AppState {
         do { try await sidecar.cancel() } catch {
             errorMessage = error.localizedDescription
         }
+        resetToDrop()
     }
 
     func resetToDrop() {
@@ -311,6 +312,7 @@ final class AppState {
                     break
                 }
             } else {
+                currentStage = nil
                 appendLog(.err, "✖ \(message ?? "failed")")
                 if stage == .review {
                     // Review cancelled by user.
