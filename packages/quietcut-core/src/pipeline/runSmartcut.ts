@@ -12,6 +12,7 @@ import {
   retakeOps,
   savePlan,
 } from "../edit-plan.js";
+import { mergeSubwordTokens } from "../llm/detect-retakes-llm.js";
 import { createGatewayClient, resolveGatewayEnv } from "../llm/gateway.js";
 import { planLlmRetakeOps } from "../planners/llm-retake-planner.js";
 import { render } from "../render.js";
@@ -28,8 +29,13 @@ import {
 } from "../utils/ffmpeg.js";
 import { warnIfUnsupportedContainer } from "../utils/paths.js";
 import { formatDuration } from "../utils/time.js";
-import type { RetakeDecision } from "./decisions.js";
+import type { RetakeDecision, RetakeReviewResult } from "./decisions.js";
 import type { PipelineEvent, Stage } from "./events.js";
+import {
+  applyReviewResult,
+  buildReviewProposals,
+  toTranscriptTokens,
+} from "./review-batch.js";
 
 /**
  * The async generator that drives a smartcut run.
@@ -45,7 +51,11 @@ import type { PipelineEvent, Stage } from "./events.js";
 export async function* runSmartcut(
   config: SmartcutConfig,
   whisperModel: string,
-): AsyncGenerator<PipelineEvent, void, RetakeDecision | undefined> {
+): AsyncGenerator<
+  PipelineEvent,
+  void,
+  RetakeDecision | RetakeReviewResult | undefined
+> {
   const overallStart = Date.now();
   const stageStarts = new Map<Stage, number>();
 
@@ -136,6 +146,9 @@ export async function* runSmartcut(
   }
 
   let plan: EditPlan;
+  // Canonical whole-word transcript (sub-word pieces merged), set after
+  // transcription. Used by the batch review screen to map cuts to words.
+  let reviewTokens: Token[] = [];
 
   // -------------------------------------------------------------------------
   // Path A: load a saved plan and skip detection.
@@ -265,6 +278,9 @@ export async function* runSmartcut(
             fillerWords: config.fillerWords,
           });
         }
+        // Canonical whole-word transcript for the batch review screen (same
+        // sub-word merge the detector uses, so cut→word mapping stays aligned).
+        reviewTokens = mergeSubwordTokens(tokens);
         const previewText = tokens
           .map((t) => t.word)
           .join(" ")
@@ -360,22 +376,67 @@ export async function* runSmartcut(
   // -------------------------------------------------------------------------
   let finalPlan = plan;
   const allRetakes = retakeOps(plan);
+  const shouldReview = !config.skipApproval && !config.planPath;
 
-  if (!config.skipApproval && !config.planPath && allRetakes.length === 0) {
+  if (shouldReview && config.batchReview) {
+    // -----------------------------------------------------------------------
+    // Batch transcript review (SwiftUI app): surface the whole transcript plus
+    // every proposed cut at once and await a single result. The user may widen,
+    // narrow, or disable any cut by selecting transcript words.
+    // -----------------------------------------------------------------------
+    yield stageStart(
+      "review",
+      allRetakes.length > 0
+        ? "Awaiting transcript review..."
+        : "No retakes detected.",
+    );
+    const proposals = buildReviewProposals(reviewTokens, allRetakes);
+    const decision = yield {
+      type: "reviewReady",
+      total: allRetakes.length,
+      transcript: toTranscriptTokens(reviewTokens),
+      proposals,
+    };
+
+    if (!decision || decision.kind === "cancel") {
+      yield stageFail("review", "Cancelled.");
+      return;
+    }
+
+    // A batch `review` result carries the adjusted per-cut decisions. Any plain
+    // RetakeDecision (e.g. a CLI auto-approve) means "apply all unchanged".
+    const approved =
+      decision.kind === "review"
+        ? applyReviewResult(reviewTokens, proposals, decision.cuts)
+        : allRetakes;
+
+    const keptOps: EditOperation[] = plan.operations.filter(
+      (op) => op.type !== "removeRetake",
+    );
+    finalPlan = {
+      ...plan,
+      operations: [...keptOps, ...approved],
+    };
+    yield stageDone(
+      "review",
+      `Keeping ${approved.length} of ${allRetakes.length} cut${allRetakes.length === 1 ? "" : "s"}.`,
+    );
+  } else if (shouldReview && allRetakes.length === 0) {
     // No retakes to review, but still surface a review step so the caller
     // can confirm before rendering (silence cuts only).
     yield stageStart("review", "No retakes detected.");
-    const decision = yield { type: "reviewReady", total: 0 };
+    const decision = yield {
+      type: "reviewReady",
+      total: 0,
+      transcript: [],
+      proposals: [],
+    };
     if (!decision || decision.kind === "cancel") {
       yield stageFail("review", "Cancelled.");
       return;
     }
     yield stageDone("review", "No retakes to review.");
-  } else if (
-    allRetakes.length > 0 &&
-    !config.skipApproval &&
-    !config.planPath
-  ) {
+  } else if (shouldReview && allRetakes.length > 0) {
     yield stageStart("review", "Awaiting retake decisions...");
     const approved: RemoveRetakeOp[] = [];
     let cancelled = false;

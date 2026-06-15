@@ -216,6 +216,18 @@ describe("RPC primitives", () => {
       /missing params.path/,
     );
   });
+
+  it("submitReview rejects when no job is running", async () => {
+    await expect(harness.request("submitReview", { cuts: [] })).rejects.toThrow(
+      /No smartcut job is running/,
+    );
+  });
+
+  it("decide rejects when no job is running", async () => {
+    await expect(
+      harness.request("decide", { opId: "r-0", action: "remove" }),
+    ).rejects.toThrow(/No smartcut job is running/);
+  });
 });
 
 describe("media handlers", () => {

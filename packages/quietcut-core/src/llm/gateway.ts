@@ -79,6 +79,15 @@ export function resolveGatewayEnv(): GatewayEnv {
   };
 }
 
+// Retake detection streams a long, reasoning-heavy generation (adaptive
+// thinking + up to 32k output tokens) over a single request. On long
+// transcripts these run for minutes, and a transient connection reset
+// occasionally slips past the SDK's default 2 retries / 10-minute timeout,
+// surfacing as a hard "Connection error". Give the client more headroom: the
+// SDK auto-retries connection errors, 408/409/429, and 5xx with backoff.
+const CLIENT_MAX_RETRIES = 5;
+const CLIENT_TIMEOUT_MS = 1000 * 60 * 20; // 20 minutes
+
 /**
  * Build an Anthropic client pointed at the AI Gateway endpoint.
  */
@@ -98,6 +107,8 @@ export function createGatewayClient(env: GatewayEnv): Anthropic {
       apiKey: null,
       baseURL,
       defaultHeaders,
+      maxRetries: CLIENT_MAX_RETRIES,
+      timeout: CLIENT_TIMEOUT_MS,
     });
   }
 
@@ -105,5 +116,7 @@ export function createGatewayClient(env: GatewayEnv): Anthropic {
     apiKey: env.anthropicApiKey!,
     baseURL,
     defaultHeaders,
+    maxRetries: CLIENT_MAX_RETRIES,
+    timeout: CLIENT_TIMEOUT_MS,
   });
 }

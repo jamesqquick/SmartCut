@@ -21,6 +21,17 @@ struct RetakeProposal: Identifiable, Sendable {
     let total: Int
 }
 
+/// Mutable per-cut state for the batch transcript-review screen. Starts from
+/// the AI proposal; the user can toggle it off or move its word boundaries.
+struct ReviewCutState: Identifiable, Sendable {
+    let opId: String
+    let op: RemoveRetakeOp
+    var enabled: Bool
+    var removeStartIndex: Int  // inclusive transcript token index
+    var removeEndIndex: Int  // inclusive transcript token index
+    var id: String { opId }
+}
+
 struct RenderStats: Sendable {
     var frame: Int?
     var fps: Double?
@@ -88,6 +99,31 @@ final class AppState {
     /// True when the pipeline paused at review with zero retakes and is
     /// awaiting a confirm-to-render decision.
     var awaitingReviewConfirmation = false
+
+    // --- batch transcript review ---
+
+    /// Full transcript (whole words + timing) for the review screen.
+    var transcript: [TranscriptToken] = []
+    /// Editable per-cut state, chronologically ordered (mirrors the proposals).
+    var reviewCuts: [ReviewCutState] = []
+
+    var enabledCutCount: Int { reviewCuts.filter(\.enabled).count }
+
+    /// Estimated total time removed by the currently-enabled cuts.
+    var reviewSavedEstimate: Double {
+        reviewCuts.filter(\.enabled).reduce(0) { $0 + estimatedDuration($1) }
+    }
+
+    /// Seconds removed by a single cut, derived from its word boundaries:
+    /// from the first removed word's start to the next kept word's onset.
+    func estimatedDuration(_ cut: ReviewCutState) -> Double {
+        guard !transcript.isEmpty else { return 0 }
+        let s = max(0, min(cut.removeStartIndex, transcript.count - 1))
+        let e = max(s, min(cut.removeEndIndex, transcript.count - 1))
+        let start = transcript[s].start
+        let end = e + 1 < transcript.count ? transcript[e + 1].start : transcript[e].end
+        return max(0, end - start)
+    }
 
     var removedCount: Int { decisions.filter { $0.action == .remove }.count }
     var keptCount: Int { decisions.filter { $0.action == .keep }.count }
@@ -273,6 +309,51 @@ final class AppState {
         }
     }
 
+    // MARK: - Batch review mutations
+
+    func setCutEnabled(_ opId: String, _ enabled: Bool) {
+        guard let i = reviewCuts.firstIndex(where: { $0.opId == opId }) else { return }
+        reviewCuts[i].enabled = enabled
+    }
+
+    /// Move a cut's start boundary to `index`, clamped so it can't cross the
+    /// cut's own end or overlap the previous cut.
+    func adjustCutStart(_ opId: String, to index: Int) {
+        guard let i = reviewCuts.firstIndex(where: { $0.opId == opId }) else { return }
+        let lower = i > 0 ? reviewCuts[i - 1].removeEndIndex + 1 : 0
+        reviewCuts[i].removeStartIndex = max(lower, min(index, reviewCuts[i].removeEndIndex))
+    }
+
+    /// Move a cut's end boundary to `index`, clamped so it can't cross the
+    /// cut's own start or overlap the next cut.
+    func adjustCutEnd(_ opId: String, to index: Int) {
+        guard let i = reviewCuts.firstIndex(where: { $0.opId == opId }) else { return }
+        let upper =
+            i < reviewCuts.count - 1
+            ? reviewCuts[i + 1].removeStartIndex - 1
+            : transcript.count - 1
+        reviewCuts[i].removeEndIndex = min(upper, max(index, reviewCuts[i].removeStartIndex))
+    }
+
+    /// Submit the (possibly adjusted) cuts and proceed to render.
+    func applyReview() async {
+        let cuts = reviewCuts.map {
+            ReviewCutDecision(
+                opId: $0.opId,
+                enabled: $0.enabled,
+                removeStartIndex: $0.removeStartIndex,
+                removeEndIndex: $0.removeEndIndex
+            )
+        }
+        awaitingReviewConfirmation = false
+        appendLog(.info, "Applying \(enabledCutCount) of \(reviewCuts.count) cut(s)")
+        do {
+            try await sidecar.submitReview(cuts: cuts)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
     func cancel() async {
         do { try await sidecar.cancel() } catch {
             errorMessage = error.localizedDescription
@@ -348,10 +429,20 @@ final class AppState {
                 .dim,
                 "… transcript: \(tokenCount) words. Preview: \"\(String(preview.prefix(80)))…\"")
 
-        case .reviewReady(let total):
+        case .reviewReady(let total, let tokens, let proposals):
             retakeTotal = total
+            transcript = tokens
+            reviewCuts = proposals.map {
+                ReviewCutState(
+                    opId: $0.opId,
+                    op: $0.op,
+                    enabled: true,
+                    removeStartIndex: $0.removeStartIndex,
+                    removeEndIndex: $0.removeEndIndex
+                )
+            }
+            awaitingReviewConfirmation = proposals.isEmpty
             currentRetake = nil
-            awaitingReviewConfirmation = true
             if screen != .review { screen = .review }
 
         case .retakeProposed(let opId, let op, let index, let total):
@@ -375,7 +466,12 @@ final class AppState {
         case .done(let plan, let output, let savedSec, let savedPercent, let elapsedSec):
             let outURL = URL(fileURLWithPath: output)
             let retakesProposed = decisions.count
-            let retakesKept = decisions.filter { $0.action == .keep }.count
+            // "Kept" = proposals the user disabled (batch flow) or chose to keep
+            // (legacy per-cut flow).
+            let retakesKept =
+                reviewCuts.isEmpty
+                ? decisions.filter { $0.action == .keep }.count
+                : reviewCuts.filter { !$0.enabled }.count
             summary = DoneSummary(
                 outputPath: outURL,
                 originalDuration: plan.duration,
@@ -435,6 +531,8 @@ final class AppState {
         currentRetake = nil
         retakeTotal = 0
         awaitingReviewConfirmation = false
+        transcript.removeAll()
+        reviewCuts.removeAll()
         decisions.removeAll()
         proposalDurations.removeAll()
         renderStats = RenderStats()

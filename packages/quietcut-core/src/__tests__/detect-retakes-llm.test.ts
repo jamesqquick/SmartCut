@@ -1,5 +1,5 @@
 import type Anthropic from "@anthropic-ai/sdk";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { detectRetakesLLM } from "../llm/detect-retakes-llm.js";
 import type { Token } from "../types.js";
 
@@ -30,6 +30,33 @@ function fakeClient(cuts: Cut[]): Anthropic {
   } as unknown as Anthropic;
 }
 
+/**
+ * A client whose stream fails with a transient connection error `failures`
+ * times, then returns a tool call. Tracks how many stream attempts were made.
+ */
+function flakyClient(
+  failures: number,
+  cuts: Cut[],
+): { client: Anthropic; attempts: () => number } {
+  let attempts = 0;
+  const client = {
+    messages: {
+      stream: () => ({
+        finalMessage: async () => {
+          attempts++;
+          if (attempts <= failures) throw new Error("Connection error.");
+          return {
+            content: [
+              { type: "tool_use", name: "report_retakes", input: { cuts } },
+            ],
+          };
+        },
+      }),
+    },
+  } as unknown as Anthropic;
+  return { client, attempts: () => attempts };
+}
+
 /** A client that answers in text only (never calls the tool). */
 function textOnlyClient(): Anthropic {
   return {
@@ -54,6 +81,52 @@ function tok(word: string, start: number, end: number): Token {
     leadingSpace: true,
   };
 }
+
+describe("detectRetakesLLM transient connection retry", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("retries a transient connection drop and then succeeds", async () => {
+    vi.useFakeTimers();
+    const tokens = [
+      tok("hello", 0, 0.3),
+      tok("world", 0.4, 0.7),
+      tok("hello", 1.0, 1.3),
+      tok("world", 1.4, 1.7),
+    ];
+    const { client, attempts } = flakyClient(2, [
+      {
+        abandonedStartIndex: 0,
+        keepStartIndex: 2,
+        keepEndIndex: 3,
+        reason: "r",
+      },
+    ]);
+
+    const promise = detectRetakesLLM(client, "m", tokens);
+    // Drive past the 1s + 2s backoffs.
+    await vi.advanceTimersByTimeAsync(5000);
+    const result = await promise;
+
+    expect(attempts()).toBe(3); // 2 failures + 1 success
+    expect(result).toHaveLength(1);
+  });
+
+  it("gives up after exhausting stream retries", async () => {
+    vi.useFakeTimers();
+    const tokens = [tok("hello", 0, 0.3), tok("world", 0.4, 0.7)];
+    const { client, attempts } = flakyClient(99, []);
+
+    const promise = detectRetakesLLM(client, "m", tokens);
+    const assertion = expect(promise).rejects.toThrow(/connection error/i);
+    // 1s + 2s + 4s backoffs across 4 total attempts.
+    await vi.advanceTimersByTimeAsync(10000);
+    await assertion;
+
+    expect(attempts()).toBe(4); // initial + MAX_STREAM_RETRIES (3)
+  });
+});
 
 describe("detectRetakesLLM", () => {
   it("returns [] for empty input without calling the model", async () => {

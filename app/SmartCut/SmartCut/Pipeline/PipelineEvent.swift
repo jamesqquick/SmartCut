@@ -42,6 +42,23 @@ struct Segment: Codable, Hashable, Sendable {
     let end: Double
 }
 
+/// One transcript word + timing. Mirrors `TranscriptToken` in `types.ts`.
+/// `id` is the token's index in the transcript array (assigned on decode).
+struct TranscriptToken: Codable, Hashable, Sendable {
+    let word: String
+    let start: Double
+    let end: Double
+}
+
+/// One AI-suggested cut mapped to a transcript token range.
+/// Mirrors `ReviewProposal` in `pipeline/events.ts`.
+struct ReviewProposal: Codable, Hashable, Sendable {
+    let opId: String
+    let op: RemoveRetakeOp
+    let removeStartIndex: Int
+    let removeEndIndex: Int
+}
+
 /// Mirrors `RemoveRetakeOp` in `edit-plan.ts`.
 struct RemoveRetakeOp: Codable, Hashable, Sendable {
     let type: String  // always "removeRetake"
@@ -127,7 +144,7 @@ enum PipelineEvent: Decodable, Hashable, Sendable {
     case metadata(durationSec: Double, sizeBytes: Int, codec: String?, width: Int?, height: Int?)
     case silenceFound(count: Int, segments: [Segment])
     case transcript(tokenCount: Int, preview: String)
-    case reviewReady(total: Int)
+    case reviewReady(total: Int, transcript: [TranscriptToken], proposals: [ReviewProposal])
     case retakeProposed(opId: String, op: RemoveRetakeOp, index: Int, total: Int)
     case retakeDecisionAck(opId: String, action: String)
     case renderProgress(frame: Int?, fps: Double?, speed: Double?, percent: Double?, etaSec: Double?)
@@ -172,6 +189,8 @@ enum PipelineEvent: Decodable, Hashable, Sendable {
 
     private struct ReviewReadyPayload: Decodable {
         let total: Int
+        let transcript: [TranscriptToken]
+        let proposals: [ReviewProposal]
     }
 
     private struct RetakeProposedPayload: Decodable {
@@ -230,7 +249,7 @@ enum PipelineEvent: Decodable, Hashable, Sendable {
             self = .transcript(tokenCount: p.tokenCount, preview: p.preview)
         case "reviewReady":
             let p = try ReviewReadyPayload(from: decoder)
-            self = .reviewReady(total: p.total)
+            self = .reviewReady(total: p.total, transcript: p.transcript, proposals: p.proposals)
         case "retakeProposed":
             let p = try RetakeProposedPayload(from: decoder)
             self = .retakeProposed(opId: p.opId, op: p.op, index: p.index, total: p.total)
