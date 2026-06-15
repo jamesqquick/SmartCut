@@ -160,6 +160,15 @@ SMARTCUT_FIXTURE="$HOME/Movies/your-clip.mov" \
   pnpm --filter quietcut-server test
 ```
 
+## Versioning
+
+The version lives in two places that must be bumped together:
+
+- `app/SmartCut/project.yml` (`CFBundleShortVersionString`) — the macOS app.
+- the four `package.json` files (`version`) — the TS workspace.
+
+There's no automated sync yet; update both when cutting a release.
+
 ## Non-goals (v1)
 
 - No code signing / notarization / DMG packaging

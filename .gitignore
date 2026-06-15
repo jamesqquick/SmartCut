@@ -14,11 +14,12 @@ xcuserdata/
 *.xcuserstate
 *.xcworkspace/xcuserdata/
 
-# Local test artifacts
+# Local media artifacts — videos/audio are large and shouldn't be tracked.
+# PNGs are intentionally NOT ignored here: app icons (Assets.xcassets) and
+# doc images are tracked. Keep throwaway media under tmp/ (ignored above).
 *.mp4
 *.mov
 *.wav
-*.png
 
 # Fixtures opt-in: explicitly track these if added later
 !packages/quietcut-core/__fixtures__/*.mp4
