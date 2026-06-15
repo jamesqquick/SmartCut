@@ -57,6 +57,10 @@ export type PipelineEvent =
       preview: string;
     }
   | {
+      type: "reviewReady";
+      total: number;
+    }
+  | {
       type: "retakeProposed";
       opId: string;
       op: RemoveRetakeOp;

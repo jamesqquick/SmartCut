@@ -278,8 +278,9 @@ function startJob(config: SmartcutConfig, whisperModel: string): JobState {
         sendEvent(value);
 
         // If the generator is waiting on a decision, block until the
-        // client sends one via `decide` (or `cancel`).
-        if (value.type === "retakeProposed") {
+        // client sends one via `decide` (or `cancel`). `reviewReady` is the
+        // zero-retake confirmation prompt; it also awaits a decision.
+        if (value.type === "retakeProposed" || value.type === "reviewReady") {
           if (state.cancelRequested) {
             nextDecision = { kind: "cancel" };
           } else {

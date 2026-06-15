@@ -85,6 +85,10 @@ final class AppState {
     var retakeTotal: Int = 0
     var decisions: [RetakeDecisionRecord] = []
 
+    /// True when the pipeline paused at review with zero retakes and is
+    /// awaiting a confirm-to-render decision.
+    var awaitingReviewConfirmation = false
+
     var removedCount: Int { decisions.filter { $0.action == .remove }.count }
     var keptCount: Int { decisions.filter { $0.action == .keep }.count }
     var savedSoFar: Double {
@@ -255,6 +259,17 @@ final class AppState {
         }
     }
 
+    /// Confirm rendering when the pipeline paused at review with zero retakes.
+    func confirmRender() async {
+        awaitingReviewConfirmation = false
+        appendLog(.info, "No retakes — proceeding to render")
+        do {
+            try await sidecar.decide(opId: "review-confirm", action: .approveRest)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
     func cancel() async {
         do { try await sidecar.cancel() } catch {
             errorMessage = error.localizedDescription
@@ -327,6 +342,12 @@ final class AppState {
             appendLog(
                 .dim,
                 "… transcript: \(tokenCount) words. Preview: \"\(String(preview.prefix(80)))…\"")
+
+        case .reviewReady(let total):
+            retakeTotal = total
+            currentRetake = nil
+            awaitingReviewConfirmation = true
+            if screen != .review { screen = .review }
 
         case .retakeProposed(let opId, let op, let index, let total):
             retakeTotal = total
@@ -408,6 +429,7 @@ final class AppState {
         activityLog.removeAll()
         currentRetake = nil
         retakeTotal = 0
+        awaitingReviewConfirmation = false
         decisions.removeAll()
         proposalDurations.removeAll()
         renderStats = RenderStats()

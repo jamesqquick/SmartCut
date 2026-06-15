@@ -275,6 +275,17 @@ export const smartcutCommand = new Command("smartcut")
           }
           return;
         }
+        case "reviewReady": {
+          // Zero retakes detected; the pipeline pauses for confirmation.
+          // The CLI auto-proceeds to render.
+          if (currentSpinner) {
+            currentSpinner.stop();
+            currentSpinner = null;
+            currentSpinnerStage = null;
+          }
+          console.log(chalk.dim("No retakes detected. Proceeding to render."));
+          return { kind: "approveRest" };
+        }
         case "retakeProposed": {
           // Pause the review spinner while the user makes a choice.
           if (currentSpinner) {
