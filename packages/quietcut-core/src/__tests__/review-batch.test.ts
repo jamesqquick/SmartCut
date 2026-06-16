@@ -3,7 +3,9 @@ import type { RemoveRetakeOp } from "../edit-plan.js";
 import type { ReviewCutDecision } from "../pipeline/decisions.js";
 import {
   applyReviewResult,
+  buildManualOp,
   buildReviewProposals,
+  MANUAL_OP_PREFIX,
   timeRangeToIndices,
   toTranscriptTokens,
 } from "../pipeline/review-batch.js";
@@ -83,6 +85,14 @@ describe("buildReviewProposals", () => {
     expect(proposals[1].removeStartIndex).toBe(6);
     expect(proposals[1].removeEndIndex).toBe(7);
   });
+
+  it("never emits the manual-cut prefix (so manual ids can't collide)", () => {
+    const ops = [retakeOp(0, 3), retakeOp(6, 8)];
+    const proposals = buildReviewProposals(tokens, ops);
+    for (const p of proposals) {
+      expect(p.opId.startsWith(MANUAL_OP_PREFIX)).toBe(false);
+    }
+  });
 });
 
 describe("toTranscriptTokens", () => {
@@ -152,10 +162,76 @@ describe("applyReviewResult", () => {
     expect(result.map((o) => o.start)).toEqual([0, 6]);
   });
 
-  it("ignores unknown opIds", () => {
+  it("ignores unknown (stale) r- opIds with no proposal", () => {
     const cuts: ReviewCutDecision[] = [
       { opId: "r-99", enabled: true, removeStartIndex: 0, removeEndIndex: 2 },
     ];
     expect(applyReviewResult(tokens, proposals, cuts)).toEqual([]);
+  });
+
+  it("builds a manual cut (m- opId) from its word range with no proposal", () => {
+    const cuts: ReviewCutDecision[] = [
+      { opId: "m-0", enabled: true, removeStartIndex: 6, removeEndIndex: 8 },
+    ];
+    const result = applyReviewResult(tokens, proposals, cuts);
+    expect(result).toHaveLength(1);
+    const op = result[0];
+    expect(op.start).toBe(6); // tokens[6].start ("open")
+    expect(op.end).toBe(9); // tokens[9].start (onset of next kept word "and")
+    expect(op.removedText).toBe("open the file");
+    expect(op.reason).toBe("Manual cut");
+    expect(op.confidence).toBe(100);
+  });
+
+  it("drops a disabled manual cut", () => {
+    const cuts: ReviewCutDecision[] = [
+      { opId: "m-0", enabled: false, removeStartIndex: 6, removeEndIndex: 8 },
+    ];
+    expect(applyReviewResult(tokens, proposals, cuts)).toEqual([]);
+  });
+
+  it("interleaves and sorts manual and AI cuts by start time", () => {
+    // AI cut r-0 → [0,2]; manual cut m-0 earlier-ending but later-starting.
+    const cuts: ReviewCutDecision[] = [
+      { opId: "m-0", enabled: true, removeStartIndex: 9, removeEndIndex: 10 },
+      { opId: "r-0", enabled: true, removeStartIndex: 0, removeEndIndex: 2 },
+    ];
+    const result = applyReviewResult(tokens, proposals, cuts);
+    expect(result.map((o) => o.start)).toEqual([0, 9]);
+    expect(result[0].reason).toBe("stumble-restart"); // AI preserved
+    expect(result[1].reason).toBe("Manual cut");
+  });
+});
+
+describe("buildManualOp", () => {
+  it("builds an op from an inclusive token range", () => {
+    const op = buildManualOp(tokens, 6, 8);
+    expect(op).not.toBeNull();
+    expect(op?.start).toBe(6);
+    expect(op?.end).toBe(9);
+    expect(op?.removedText).toBe("open the file");
+    expect(op?.reason).toBe("Manual cut");
+    expect(op?.confidence).toBe(100);
+  });
+
+  it("builds a single-word cut", () => {
+    const op = buildManualOp(tokens, 8, 8);
+    expect(op?.start).toBe(8);
+    expect(op?.end).toBe(9);
+    expect(op?.removedText).toBe("file");
+  });
+
+  it("ends at the last token's end when the cut runs to the transcript end", () => {
+    const last = tokens.length - 1; // "save" -> [10, 11)
+    const op = buildManualOp(tokens, last, last);
+    expect(op?.start).toBe(tokens[last].start);
+    expect(op?.end).toBe(tokens[last].end); // no next token; falls back to end
+    expect(op?.removedText).toBe("save");
+  });
+
+  it("clamps out-of-range indices into the transcript", () => {
+    const op = buildManualOp(tokens, -5, 999);
+    expect(op?.start).toBe(0);
+    expect(op?.end).toBe(tokens[tokens.length - 1].end);
   });
 });

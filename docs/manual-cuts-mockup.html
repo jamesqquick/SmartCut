@@ -1,0 +1,662 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SmartCut — Manual Cuts Mockup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  /* ============================================================
+     Design tokens — mirrors docs/ui-mockup.html / Theme.swift
+     ============================================================ */
+  :root {
+    --font-sans: "Manrope", "Inter", ui-sans-serif, -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    --font-mono: "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+    --radius: 6px;
+    --radius-sm: 4px;
+    --radius-pill: 9999px;
+
+    --iris: #5848f2;
+    --iris-hover: #6d5dff;
+    --lumen: #9aa0ff;
+    --teal: #19c8d6;
+    --teal-soft: #5fe0e8;
+    --shadow-float: rgba(0, 0, 0, 0.35) 0px 16px 32px 0px;
+  }
+
+  :root[data-theme="light"] {
+    --canvas: #e5edf5;  --card: #f8fafd;  --elevated: #ffffff;  --wash: #e2e4ff;
+    --ink: #061b31;  --body: #50617a;  --muted: #64748d;  --tertiary: #7d8ba4;
+    --border: #d7e0eb;  --border-strong: #c2cedd;
+    --accent: var(--iris);  --accent-wash: var(--wash);
+    --good: #5c9a12;  --good-wash: rgba(129, 184, 26, 0.14);
+    --danger: #d23b2f;  --danger-wash: rgba(210, 59, 47, 0.10);  --danger-text: #b4322a;
+    --grad-title: linear-gradient(96deg, var(--iris) 0%, var(--teal) 100%);
+  }
+
+  :root[data-theme="dark"] {
+    --canvas: #0a0e1a;  --card: #121826;  --elevated: #1a2233;  --wash: rgba(83, 58, 253, 0.16);
+    --ink: #f0f3f9;  --body: #aab6c8;  --muted: #7d8ba4;  --tertiary: #64748d;
+    --border: rgba(255, 255, 255, 0.08);  --border-strong: rgba(255, 255, 255, 0.16);
+    --accent: var(--iris);  --accent-wash: rgba(83, 58, 253, 0.18);
+    --good: #9ad13a;  --good-wash: rgba(129, 184, 26, 0.14);
+    --danger: #ff6b60;  --danger-wash: rgba(255, 69, 58, 0.12);  --danger-text: #ff8a80;
+    --grad-title: linear-gradient(96deg, var(--lumen) 0%, var(--teal-soft) 100%);
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0; padding: 0;
+    background: radial-gradient(60% 50% at 50% 0%, rgba(88,72,242,0.06), transparent 70%), var(--canvas);
+    color: var(--ink);
+    font: 400 15px/1.5 var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .app {
+    max-width: 1180px;
+    margin: 0 auto;
+    min-height: 100vh;
+    display: grid;
+    grid-template-columns: 230px 1fr;
+  }
+
+  /* ---------------- Sidebar ---------------- */
+  .sidebar {
+    border-right: 1px solid var(--border);
+    padding: 24px 0;
+    background: var(--card);
+  }
+  .brand { padding: 0 20px 22px; display: flex; align-items: center; gap: 9px; }
+  .brand .mark {
+    width: 26px; height: 26px; border-radius: 7px;
+    background: var(--grad-title);
+    display: grid; place-items: center; color: #fff; font-weight: 600; font-size: 14px;
+  }
+  .brand .name { font-weight: 500; letter-spacing: -0.2px; }
+  .section-head {
+    padding: 0 20px; margin: 18px 0 8px;
+    font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted);
+  }
+  .stat-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 3px 20px; font-size: 11.5px;
+  }
+  .stat-row .label { color: var(--muted); }
+  .stat-row .val { font-weight: 600; font-variant-numeric: tabular-nums; }
+  .stat-row .val.good { color: var(--good); }
+
+  .stepper { padding: 0 20px 14px; border-bottom: 1px solid var(--border); margin-bottom: 4px; }
+  .step { display: flex; align-items: center; gap: 9px; padding: 5px 0; color: var(--muted); font-size: 12.5px; }
+  .step .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--border-strong); }
+  .step.done .dot { background: var(--good); }
+  .step.active { color: var(--ink); font-weight: 500; }
+  .step.active .dot { background: var(--accent); box-shadow: 0 0 0 4px var(--accent-wash); }
+
+  /* ---------------- Content ---------------- */
+  .content { display: flex; flex-direction: column; min-width: 0; }
+  .header { padding: 26px 36px 14px; }
+  .header .eyebrow { font-size: 10px; letter-spacing: 0.08em; color: var(--muted); margin: 0 0 6px; }
+  .header h1 {
+    margin: 0; font-size: 27px; font-weight: 300; letter-spacing: -0.5px;
+    background: var(--grad-title); -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .header .subtitle { margin: 8px 0 0; font-size: 12.5px; color: var(--body); max-width: 640px; }
+  .header-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 20px; }
+  .header-actions { display: flex; gap: 12px; flex-shrink: 0; padding-top: 4px; }
+
+  .btn {
+    font: 400 13px var(--font-sans); border-radius: var(--radius); cursor: pointer;
+    padding: 9px 16px; border: 1px solid transparent; transition: background .12s, border-color .12s;
+  }
+  .btn.primary { background: var(--accent); color: #fff; }
+  .btn.primary:hover { background: var(--iris-hover); }
+  .btn.secondary { background: transparent; color: var(--ink); border-color: var(--ink); }
+  .btn.secondary:hover { background: var(--ink); color: var(--canvas); }
+
+  /* ---------------- Cut strip ---------------- */
+  .cut-strip-wrap { padding: 4px 36px 14px; }
+  .cut-strip { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 4px; }
+  .cut-chip {
+    flex-shrink: 0; width: 178px; padding: 11px 12px;
+    background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
+    cursor: pointer; transition: border-color .12s, background .12s;
+  }
+  .cut-chip.active { background: var(--wash); border-color: var(--accent); }
+  .cut-chip.disabled { opacity: 0.55; }
+  .cut-chip .chip-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .cut-chip .chip-title { font-size: 12.5px; font-weight: 600; }
+  .cut-chip.disabled .chip-title { color: var(--muted); }
+  .cut-chip .chip-meta { font-size: 10px; color: var(--muted); margin-top: 7px; }
+  .cut-chip .chip-dur { font-size: 10px; font-weight: 500; color: var(--danger-text); margin-top: 3px; }
+  .cut-chip.disabled .chip-dur { color: var(--muted); }
+
+  .badge {
+    font-size: 9px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase;
+    padding: 2px 6px; border-radius: var(--radius-pill);
+  }
+  .badge.manual { background: var(--accent-wash); color: var(--lumen); }
+  :root[data-theme="light"] .badge.manual { color: var(--iris); }
+  .badge.ai { background: rgba(25,200,214,0.14); color: var(--teal-soft); }
+  :root[data-theme="light"] .badge.ai { color: #0c8f9b; }
+
+  .chip-controls { display: flex; align-items: center; gap: 6px; }
+
+  /* toggle switch */
+  .switch { position: relative; width: 28px; height: 16px; flex-shrink: 0; }
+  .switch input { display: none; }
+  .switch .track {
+    position: absolute; inset: 0; border-radius: var(--radius-pill);
+    background: var(--border-strong); transition: background .15s;
+  }
+  .switch .thumb {
+    position: absolute; top: 2px; left: 2px; width: 12px; height: 12px; border-radius: 50%;
+    background: #fff; transition: transform .15s;
+  }
+  .switch input:checked + .track { background: var(--accent); }
+  .switch input:checked + .track + .thumb { transform: translateX(12px); }
+
+  .chip-delete {
+    border: none; background: transparent; color: var(--muted); cursor: pointer;
+    width: 18px; height: 18px; border-radius: var(--radius-sm); font-size: 13px; line-height: 1;
+    display: grid; place-items: center;
+  }
+  .chip-delete:hover { background: var(--danger-wash); color: var(--danger); }
+
+  .divider { height: 1px; background: var(--border); }
+
+  /* ---------------- Transcript ---------------- */
+  .transcript-scroll { flex: 1; overflow-y: auto; padding: 22px 36px 120px; }
+  .transcript { position: relative; line-height: 2.1; font-size: 15.5px; user-select: none; }
+  .w {
+    display: inline; padding: 2px 2px; margin: 0 1px; border-radius: var(--radius-sm);
+    cursor: pointer; transition: background .08s;
+  }
+  .w:hover { background: var(--wash); }
+  /* committed cut */
+  .w.cut {
+    color: var(--danger-text); text-decoration: line-through; text-decoration-color: var(--danger);
+    background: var(--danger-wash);
+  }
+  .w.cut.active-cut { background: rgba(255,69,58,0.22); }
+  /* pending selection (not yet a cut) */
+  .w.sel {
+    background: var(--accent-wash);
+    box-shadow: inset 0 0 0 1px var(--accent);
+    color: var(--ink); text-decoration: none;
+  }
+  .w.anchor {
+    box-shadow: inset 0 0 0 1.5px var(--accent);
+    background: var(--accent-wash);
+  }
+  /* tiny floating hint anchored under a pending word */
+  .anchor-hint {
+    position: absolute; transform: translate(-50%, 8px);
+    background: var(--elevated); border: 1px solid var(--border-strong);
+    border-radius: var(--radius-pill); padding: 3px 10px;
+    font-size: 10.5px; color: var(--body); white-space: nowrap;
+    box-shadow: var(--shadow-float); pointer-events: none; z-index: 15;
+  }
+  .anchor-hint b { color: var(--ink); font-weight: 600; }
+
+  /* draggable word-boundary handles for the active cut */
+  .cut-handle {
+    position: absolute; width: 14px; z-index: 16; cursor: ew-resize;
+    display: flex; justify-content: center;
+  }
+  .cut-handle .bar { width: 3px; height: 100%; background: var(--accent); border-radius: 2px; }
+  .cut-handle .knob {
+    position: absolute; top: -7px; width: 11px; height: 11px; border-radius: 50%;
+    background: var(--accent); border: 1.5px solid #fff;
+    box-shadow: 0 1px 3px rgba(0,0,0,.4);
+  }
+
+  /* ---------------- Help / toolbar ---------------- */
+  .toolbar {
+    display: flex; align-items: center; gap: 10px; padding: 0 36px 12px;
+    font-size: 11.5px; color: var(--muted);
+  }
+  .toolbar kbd {
+    background: var(--elevated); border: 1px solid var(--border-strong); border-bottom-width: 2px;
+    border-radius: var(--radius-sm); padding: 1px 6px; font: 500 10.5px var(--font-mono); color: var(--body);
+  }
+  .toolbar .pill {
+    margin-left: auto; display: flex; align-items: center; gap: 8px;
+    background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-pill); padding: 4px 4px 4px 12px;
+  }
+  .toolbar .pill button {
+    border: none; background: transparent; color: var(--muted); cursor: pointer; font: 500 11px var(--font-sans);
+    padding: 4px 10px; border-radius: var(--radius-pill);
+  }
+  .toolbar .pill button.on { background: var(--accent); color: #fff; }
+
+  .empty-hint { color: var(--tertiary); font-style: italic; font-size: 13px; padding: 6px 0; }
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="brand"><div class="mark">S</div><div class="name">SmartCut</div></div>
+    <div class="stepper">
+      <div class="step done"><div class="dot"></div>Dropped</div>
+      <div class="step done"><div class="dot"></div>Transcribed</div>
+      <div class="step active"><div class="dot"></div>Review</div>
+      <div class="step"><div class="dot"></div>Render</div>
+    </div>
+    <div class="section-head">Review</div>
+    <div class="stat-row"><span class="label">Cuts enabled</span><span class="val" id="stat-enabled">2 / 2</span></div>
+    <div class="stat-row"><span class="label">Est. time saved</span><span class="val good" id="stat-saved">0.0s</span></div>
+    <div class="stat-row"><span class="label">Words</span><span class="val" id="stat-words">0</span></div>
+    <div class="section-head">Cut sources</div>
+    <div class="stat-row"><span class="label">AI-suggested</span><span class="val" id="stat-ai">2</span></div>
+    <div class="stat-row"><span class="label">Manual</span><span class="val" id="stat-manual">0</span></div>
+  </aside>
+
+  <!-- Content -->
+  <main class="content">
+    <div class="header">
+      <div class="header-row">
+        <div>
+          <p class="eyebrow">REVIEW</p>
+          <h1>Review cuts</h1>
+          <p class="subtitle">
+            Click a word, then <b>Shift</b>-click another to instantly cut that range (Shift-click the
+            same word to cut just it). Click an existing cut to drag its handles. Toggle a cut off to
+            keep that take, or delete a manual cut with ×.
+          </p>
+        </div>
+        <div class="header-actions">
+          <button class="btn secondary">Cancel</button>
+          <button class="btn primary" id="apply-btn">Apply 2 cuts</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="cut-strip-wrap">
+      <div class="cut-strip" id="cut-strip"></div>
+    </div>
+
+    <div class="toolbar">
+      <span>Cut:</span>
+      <span><kbd>Click</kbd> start</span>
+      <span><kbd>Shift</kbd>+<kbd>Click</kbd> end → cuts instantly</span>
+      <span>Drag handles or <kbd>←</kbd> <kbd>→</kbd> / <kbd>⌥←</kbd> <kbd>⌥→</kbd> to resize</span>
+      <span><kbd>Esc</kbd> clear anchor</span>
+      <div class="pill">
+        <span>Theme</span>
+        <button id="theme-dark" class="on">Dark</button>
+        <button id="theme-light">Light</button>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="transcript-scroll">
+      <div class="transcript" id="transcript"></div>
+    </div>
+  </main>
+</div>
+
+<script>
+// ============================================================
+// Mock transcript — word-level tokens with timings (seconds).
+// Mirrors TranscriptToken { word, start, end }.
+// ============================================================
+const SENTENCE =
+  "So today I want to talk about — um, I want to talk about how SmartCut " +
+  "actually works under the hood. The the the first thing it does, well, the " +
+  "first thing it does is transcribe your audio with Whisper. And then, you know, " +
+  "it sends that transcript to Claude to find retakes and false starts. " +
+  "Let me show you, let me actually show you what that looks like in practice.";
+
+const words = SENTENCE.split(/\s+/);
+// fabricate plausible timings: ~0.32s per word
+const transcript = words.map((w, i) => ({
+  word: w,
+  start: +(i * 0.32).toFixed(2),
+  end: +((i + 1) * 0.32).toFixed(2),
+}));
+
+// Pre-existing AI cuts (inclusive token index ranges). opId r-N.
+// Indices chosen to land on the stammers / filler in the text above.
+function findRange(phrase) {
+  const target = phrase.split(/\s+/);
+  for (let i = 0; i <= words.length - target.length; i++) {
+    if (target.every((t, k) => words[i + k] === t)) {
+      return { s: i, e: i + target.length - 1 };
+    }
+  }
+  return null;
+}
+
+let manualCounter = 0;
+const r1 = findRange("— um, I want to talk about");
+const r2 = findRange("The the the");
+
+let cuts = [
+  { opId: "r-0", source: "ai", confidence: 88, enabled: true, start: r1.s, end: r1.e },
+  { opId: "r-1", source: "ai", confidence: 76, enabled: true, start: r2.s, end: r2.e },
+].sort((a, b) => a.start - b.start);
+
+// transient selection state (lives in the "view").
+// Only an anchor is needed: a shift-click commits the cut immediately, so
+// there is no "pending range" to confirm.
+let anchor = null;   // token index of the click that started a selection
+let activeCutId = cuts[0]?.opId ?? null;
+
+// ---------- helpers ----------
+function cutDuration(c) {
+  const s = Math.max(0, Math.min(c.start, transcript.length - 1));
+  const e = Math.max(s, Math.min(c.end, transcript.length - 1));
+  const start = transcript[s].start;
+  const end = e + 1 < transcript.length ? transcript[e + 1].start : transcript[e].end;
+  return Math.max(0, end - start);
+}
+
+function cutContaining(i) {
+  return cuts.find(c => c.enabled && i >= c.start && i <= c.end) || null;
+}
+
+function fmt(sec) { return sec.toFixed(1) + "s"; }
+
+// ---------- merge-on-create (mirrors AppState.createManualCut) ----------
+function createManualCut(s, e) {
+  if (s > e) [s, e] = [e, s];
+  // absorb any cut that overlaps OR is contiguous with [s, e]
+  let lo = s, hi = e;
+  const survivors = [];
+  for (const c of cuts) {
+    const touches = c.start <= hi + 1 && c.end >= lo - 1;
+    if (touches) {
+      lo = Math.min(lo, c.start);
+      hi = Math.max(hi, c.end);
+    } else {
+      survivors.push(c);
+    }
+  }
+  const merged = {
+    opId: "m-" + (manualCounter++),
+    source: "manual",
+    confidence: null,
+    enabled: true,
+    start: lo,
+    end: hi,
+  };
+  survivors.push(merged);
+  survivors.sort((a, b) => a.start - b.start);
+  cuts = survivors;
+  activeCutId = merged.opId;
+  anchor = null;
+  render();
+}
+
+function deleteCut(opId) {
+  cuts = cuts.filter(c => c.opId !== opId);
+  if (activeCutId === opId) activeCutId = cuts[0]?.opId ?? null;
+  render();
+}
+
+function setEnabled(opId, on) {
+  const c = cuts.find(x => x.opId === opId);
+  if (c) c.enabled = on;
+  render();
+}
+
+// ---------- resize the active cut (mirrors AppState.adjustCut{Start,End}) ----------
+function adjustCutStart(opId, index) {
+  const i = cuts.findIndex(c => c.opId === opId);
+  if (i < 0) return;
+  const lower = i > 0 ? cuts[i - 1].end + 1 : 0;
+  cuts[i].start = Math.max(lower, Math.min(index, cuts[i].end));
+  render();
+}
+function adjustCutEnd(opId, index) {
+  const i = cuts.findIndex(c => c.opId === opId);
+  if (i < 0) return;
+  const upper = i < cuts.length - 1 ? cuts[i + 1].start - 1 : transcript.length - 1;
+  cuts[i].end = Math.min(upper, Math.max(index, cuts[i].start));
+  render();
+}
+
+// ---------- rendering ----------
+const elTranscript = document.getElementById("transcript");
+const elStrip = document.getElementById("cut-strip");
+
+let wordSpans = [];   // index -> span element, for handle positioning + hit-testing
+
+function render() {
+  renderTranscript();
+  renderHandles();
+  renderStrip();
+  renderStats();
+}
+
+function renderTranscript() {
+  elTranscript.innerHTML = "";
+  wordSpans = [];
+  let anchorSpan = null;
+  transcript.forEach((tok, i) => {
+    const span = document.createElement("span");
+    span.className = "w";
+    span.textContent = tok.word;
+    const cut = cutContaining(i);
+    if (cut) {
+      span.classList.add("cut");
+      if (cut.opId === activeCutId) span.classList.add("active-cut");
+    }
+    if (anchor === i) {
+      span.classList.add("anchor");
+      anchorSpan = span;
+    }
+    span.addEventListener("click", (ev) => onWordClick(i, ev));
+    wordSpans[i] = span;
+    elTranscript.appendChild(span);
+    elTranscript.appendChild(document.createTextNode(" "));
+  });
+
+  // floating "shift-click to cut" hint anchored under the pending word
+  if (anchorSpan) {
+    const hint = document.createElement("div");
+    hint.className = "anchor-hint";
+    hint.innerHTML = "<b>Shift</b>-click another word to cut the range";
+    elTranscript.appendChild(hint);
+    hint.style.left = (anchorSpan.offsetLeft + anchorSpan.offsetWidth / 2) + "px";
+    hint.style.top = (anchorSpan.offsetTop + anchorSpan.offsetHeight) + "px";
+  }
+}
+
+// Draggable start/end handles for the active, enabled cut — works the same
+// for AI and manual cuts (the active cut is just a ReviewCutState).
+function renderHandles() {
+  const cut = cuts.find(c => c.opId === activeCutId && c.enabled);
+  if (!cut) return;
+  const startSpan = wordSpans[cut.start];
+  const endSpan = wordSpans[cut.end];
+  if (!startSpan || !endSpan) return;
+
+  elTranscript.appendChild(
+    makeHandle(startSpan.offsetLeft, startSpan, (idx) => adjustCutStart(cut.opId, idx))
+  );
+  elTranscript.appendChild(
+    makeHandle(endSpan.offsetLeft + endSpan.offsetWidth, endSpan, (idx) => adjustCutEnd(cut.opId, idx))
+  );
+}
+
+function makeHandle(boundaryX, refSpan, onMove) {
+  const h = document.createElement("div");
+  h.className = "cut-handle";
+  h.innerHTML = '<div class="bar"></div><div class="knob"></div>';
+  h.style.left = (boundaryX - 7) + "px";
+  h.style.top = (refSpan.offsetTop - 4) + "px";
+  h.style.height = (refSpan.offsetHeight + 8) + "px";
+  h.addEventListener("pointerdown", (e) => {
+    e.preventDefault();
+    h.setPointerCapture(e.pointerId);
+    const onPointerMove = (ev) => {
+      const idx = nearestWordIndex(ev.clientX, ev.clientY);
+      if (idx !== null) onMove(idx);
+    };
+    const onPointerUp = () => {
+      h.removeEventListener("pointermove", onPointerMove);
+      h.removeEventListener("pointerup", onPointerUp);
+    };
+    h.addEventListener("pointermove", onPointerMove);
+    h.addEventListener("pointerup", onPointerUp);
+  });
+  return h;
+}
+
+// Index of the word whose center is nearest the given client point.
+function nearestWordIndex(clientX, clientY) {
+  let best = null, bestDist = Infinity;
+  for (let i = 0; i < wordSpans.length; i++) {
+    const r = wordSpans[i].getBoundingClientRect();
+    const dx = (r.left + r.width / 2) - clientX;
+    const dy = (r.top + r.height / 2) - clientY;
+    const d = dx * dx + dy * dy;
+    if (d < bestDist) { bestDist = d; best = i; }
+  }
+  return best;
+}
+
+function chipDur(c) { return fmt(cutDuration(c)); }
+
+function renderStrip() {
+  elStrip.innerHTML = "";
+  if (cuts.length === 0) {
+    const hint = document.createElement("div");
+    hint.className = "empty-hint";
+    hint.textContent = "No cuts. Select words in the transcript to create one.";
+    elStrip.appendChild(hint);
+    return;
+  }
+  cuts.forEach((c, idx) => {
+    const chip = document.createElement("div");
+    chip.className = "cut-chip" + (c.opId === activeCutId ? " active" : "") + (c.enabled ? "" : " disabled");
+    chip.addEventListener("click", (e) => {
+      if (e.target.closest(".chip-controls")) return;
+      activeCutId = c.opId; render();
+    });
+
+    const top = document.createElement("div");
+    top.className = "chip-top";
+
+    const left = document.createElement("div");
+    left.style.display = "flex"; left.style.alignItems = "center"; left.style.gap = "7px";
+    const title = document.createElement("span");
+    title.className = "chip-title";
+    title.textContent = "Cut " + (idx + 1);
+    const badge = document.createElement("span");
+    badge.className = "badge " + (c.source === "manual" ? "manual" : "ai");
+    badge.textContent = c.source === "manual" ? "Manual" : "AI";
+    left.appendChild(title); left.appendChild(badge);
+
+    const controls = document.createElement("div");
+    controls.className = "chip-controls";
+    // toggle
+    const sw = document.createElement("label");
+    sw.className = "switch";
+    const cb = document.createElement("input");
+    cb.type = "checkbox"; cb.checked = c.enabled;
+    cb.addEventListener("change", () => setEnabled(c.opId, cb.checked));
+    const track = document.createElement("span"); track.className = "track";
+    const thumb = document.createElement("span"); thumb.className = "thumb";
+    sw.appendChild(cb); sw.appendChild(track); sw.appendChild(thumb);
+    controls.appendChild(sw);
+    // delete (manual only)
+    if (c.source === "manual") {
+      const del = document.createElement("button");
+      del.className = "chip-delete"; del.textContent = "×"; del.title = "Delete cut";
+      del.addEventListener("click", () => deleteCut(c.opId));
+      controls.appendChild(del);
+    }
+
+    top.appendChild(left); top.appendChild(controls);
+
+    const meta = document.createElement("div");
+    meta.className = "chip-meta";
+    meta.textContent = c.source === "manual" ? "Manual cut" : c.confidence + "% confidence";
+
+    const dur = document.createElement("div");
+    dur.className = "chip-dur";
+    dur.textContent = chipDur(c) + " removed";
+
+    chip.appendChild(top); chip.appendChild(meta); chip.appendChild(dur);
+    elStrip.appendChild(chip);
+  });
+}
+
+function renderStats() {
+  const enabled = cuts.filter(c => c.enabled);
+  document.getElementById("stat-enabled").textContent = enabled.length + " / " + cuts.length;
+  const saved = enabled.reduce((a, c) => a + cutDuration(c), 0);
+  document.getElementById("stat-saved").textContent = fmt(saved);
+  document.getElementById("stat-words").textContent = transcript.length;
+  document.getElementById("stat-ai").textContent = cuts.filter(c => c.source === "ai").length;
+  document.getElementById("stat-manual").textContent = cuts.filter(c => c.source === "manual").length;
+  document.getElementById("apply-btn").textContent =
+    "Apply " + enabled.length + " cut" + (enabled.length === 1 ? "" : "s");
+}
+
+// ---------- interaction ----------
+function onWordClick(i, ev) {
+  // Shift-click commits a cut immediately. If an anchor is set, cut the range
+  // [anchor, i]; if not, treat this word as the anchor AND end (single-word cut).
+  if (ev.shiftKey) {
+    const start = anchor !== null ? anchor : i;
+    createManualCut(start, i);
+    return;
+  }
+
+  // Plain click on an existing cut selects it for handle-editing.
+  const cut = cutContaining(i);
+  if (cut) {
+    activeCutId = cut.opId;
+    anchor = null;
+    render();
+    return;
+  }
+
+  // Plain click on a free word anchors the start of a new selection.
+  anchor = i;
+  render();
+}
+
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") { anchor = null; render(); return; }
+
+  // Arrow keys resize the active cut. ←/→ moves the end boundary;
+  // ⌥←/⌥→ moves the start boundary (matches TranscriptReviewView).
+  const cut = cuts.find(c => c.opId === activeCutId && c.enabled);
+  if (!cut) return;
+  const toStart = e.altKey;
+  if (e.key === "ArrowLeft") {
+    e.preventDefault();
+    toStart ? adjustCutStart(cut.opId, cut.start - 1) : adjustCutEnd(cut.opId, cut.end - 1);
+  } else if (e.key === "ArrowRight") {
+    e.preventDefault();
+    toStart ? adjustCutStart(cut.opId, cut.start + 1) : adjustCutEnd(cut.opId, cut.end + 1);
+  }
+});
+
+// theme toggle
+const root = document.documentElement;
+document.getElementById("theme-dark").addEventListener("click", () => {
+  root.dataset.theme = "dark";
+  document.getElementById("theme-dark").classList.add("on");
+  document.getElementById("theme-light").classList.remove("on");
+});
+document.getElementById("theme-light").addEventListener("click", () => {
+  root.dataset.theme = "light";
+  document.getElementById("theme-light").classList.add("on");
+  document.getElementById("theme-dark").classList.remove("on");
+});
+
+render();
+</script>
+</body>
+</html>

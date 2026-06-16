@@ -21,11 +21,21 @@ struct RetakeProposal: Identifiable, Sendable {
     let total: Int
 }
 
-/// Mutable per-cut state for the batch transcript-review screen. Starts from
-/// the AI proposal; the user can toggle it off or move its word boundaries.
+/// Where a review cut came from. AI cuts carry a Claude `op` + confidence;
+/// manual cuts are drawn by the user from a transcript selection.
+enum CutSource: Sendable {
+    case ai
+    case manual
+}
+
+/// Mutable per-cut state for the batch transcript-review screen. AI cuts start
+/// from a Claude proposal; manual cuts are created by the user from a text
+/// selection. Either can be toggled off or have its word boundaries moved.
 struct ReviewCutState: Identifiable, Sendable {
     let opId: String
-    let op: RemoveRetakeOp
+    /// The originating AI proposal, or `nil` for a manual cut.
+    let op: RemoveRetakeOp?
+    let source: CutSource
     var enabled: Bool
     var removeStartIndex: Int  // inclusive transcript token index
     var removeEndIndex: Int  // inclusive transcript token index
@@ -311,9 +321,65 @@ final class AppState {
 
     // MARK: - Batch review mutations
 
+    /// Monotonic counter for manual-cut opIds (`m-0`, `m-1`, …). Never reused,
+    /// so ids stay unique even after cuts are deleted.
+    private var manualCutCounter = 0
+
     func setCutEnabled(_ opId: String, _ enabled: Bool) {
         guard let i = reviewCuts.firstIndex(where: { $0.opId == opId }) else { return }
         reviewCuts[i].enabled = enabled
+    }
+
+    /// Create a manual cut from a transcript word selection (inclusive indices).
+    ///
+    /// Any existing cut that overlaps or is contiguous with the selection is
+    /// absorbed into one combined manual cut spanning the union, which keeps the
+    /// non-overlapping, start-sorted invariant the handle clamping relies on.
+    /// Absorbing happens regardless of a cut's enabled state, and the result is
+    /// always an enabled manual cut. Returns the new cut's opId so the caller can
+    /// make it active, or `nil` if there's no transcript to cut.
+    @discardableResult
+    func createManualCut(from startIndex: Int, to endIndex: Int) -> String? {
+        guard !transcript.isEmpty else { return nil }
+
+        var s = max(0, min(startIndex, transcript.count - 1))
+        var e = max(0, min(endIndex, transcript.count - 1))
+        if s > e { swap(&s, &e) }
+
+        var lo = s
+        var hi = e
+        var survivors: [ReviewCutState] = []
+        for cut in reviewCuts {
+            let touches = cut.removeStartIndex <= hi + 1 && cut.removeEndIndex >= lo - 1
+            if touches {
+                lo = min(lo, cut.removeStartIndex)
+                hi = max(hi, cut.removeEndIndex)
+            } else {
+                survivors.append(cut)
+            }
+        }
+
+        let opId = "m-\(manualCutCounter)"
+        manualCutCounter += 1
+        survivors.append(
+            ReviewCutState(
+                opId: opId,
+                op: nil,
+                source: .manual,
+                enabled: true,
+                removeStartIndex: lo,
+                removeEndIndex: hi
+            )
+        )
+        survivors.sort { $0.removeStartIndex < $1.removeStartIndex }
+        reviewCuts = survivors
+        return opId
+    }
+
+    /// Remove a cut entirely. Used by the manual-cut delete affordance; AI cuts
+    /// are toggled off rather than deleted.
+    func deleteCut(_ opId: String) {
+        reviewCuts.removeAll { $0.opId == opId }
     }
 
     /// Move a cut's start boundary to `index`, clamped so it can't cross the
@@ -436,6 +502,7 @@ final class AppState {
                 ReviewCutState(
                     opId: $0.opId,
                     op: $0.op,
+                    source: .ai,
                     enabled: true,
                     removeStartIndex: $0.removeStartIndex,
                     removeEndIndex: $0.removeEndIndex
@@ -533,6 +600,7 @@ final class AppState {
         awaitingReviewConfirmation = false
         transcript.removeAll()
         reviewCuts.removeAll()
+        manualCutCounter = 0
         decisions.removeAll()
         proposalDurations.removeAll()
         renderStats = RenderStats()
