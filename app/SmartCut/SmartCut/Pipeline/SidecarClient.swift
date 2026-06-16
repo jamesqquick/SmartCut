@@ -335,6 +335,53 @@ final class SidecarClient {
         )
     }
 
+    /// Request a faithful audio preview of a single cut boundary.
+    ///
+    /// The sidecar runs `planToKeepSegments` on the supplied cuts + silences,
+    /// intersects the result with `[focusStart − padSec, focusEnd + tailSec]`,
+    /// and stitches the surviving segments into a temp WAV that reflects exactly
+    /// what the final render will sound like at that boundary.
+    func extractEditedPreview(
+        input: URL,
+        duration: Double,
+        focusStart: Double,
+        focusEnd: Double,
+        padSec: Double = 2.5,
+        tailSec: Double = 2.5,
+        leadInMs: Int = 300,
+        tailOutMs: Int = 300,
+        cuts: [Segment] = [],
+        silences: [Segment] = []
+    ) async throws -> AudioClip {
+        struct P: Encodable {
+            let path: String
+            let duration: Double
+            let focusStart: Double
+            let focusEnd: Double
+            let padSec: Double
+            let tailSec: Double
+            let leadInMs: Int
+            let tailOutMs: Int
+            let cuts: [Segment]
+            let silences: [Segment]
+        }
+        return try await request(
+            method: "extractEditedPreview",
+            params: P(
+                path: input.path,
+                duration: duration,
+                focusStart: focusStart,
+                focusEnd: focusEnd,
+                padSec: padSec,
+                tailSec: tailSec,
+                leadInMs: leadInMs,
+                tailOutMs: tailOutMs,
+                cuts: cuts,
+                silences: silences
+            )
+        )
+    }
+
     @discardableResult
     func start(input: URL, options: StartOptions) async throws -> String {
         struct P: Encodable {
