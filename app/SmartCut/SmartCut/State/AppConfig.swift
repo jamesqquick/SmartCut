@@ -42,6 +42,26 @@ struct AppConfig: Codable, Equatable, Sendable {
         return hasCfToken || hasAnthropic
     }
 
+    /// Return a copy with empty strings converted to `nil` and defaults
+    /// applied for `ffmpegDir` and `cfAigGatewayId`. Used before saving
+    /// from both `FirstRunSheet` and `CredentialsSettingsView`.
+    func trimmedForSave() -> AppConfig {
+        AppConfig(
+            nodePath: nilIfEmpty(nodePath),
+            ffmpegDir: nilIfEmpty(ffmpegDir) ?? "/opt/homebrew/bin",
+            sidecarPath: nilIfEmpty(sidecarPath),
+            cloudflareAccountId: nilIfEmpty(cloudflareAccountId),
+            cfAigGatewayId: nilIfEmpty(cfAigGatewayId) ?? "default",
+            cfAigToken: nilIfEmpty(cfAigToken),
+            anthropicApiKey: nilIfEmpty(anthropicApiKey)
+        )
+    }
+
+    private func nilIfEmpty(_ s: String?) -> String? {
+        guard let s = s?.trimmingCharacters(in: .whitespacesAndNewlines), !s.isEmpty else { return nil }
+        return s
+    }
+
     // MARK: Persistence
 
     /// `~/.smartcut/config.json`

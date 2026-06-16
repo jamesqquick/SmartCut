@@ -82,20 +82,28 @@ final class AppState {
 
     enum Screen: Sendable {
         case drop
-        case settings
         case running
         case review
         case render
         case done
     }
 
+    /// Which tab the native Settings window should open to. Set before
+    /// calling `openSettings()` so the window navigates to the right pane.
+    enum SettingsTab: Hashable, Sendable {
+        case detection
+        case output
+        case credentials
+    }
+
     // --- routing + input ---
 
     var screen: Screen = .drop
+    var settingsTab: SettingsTab = .detection
     var droppedFile: URL?
     var metadata: VideoMetadata?
 
-    // --- settings (mirrors SmartcutConfig knobs the UI exposes) ---
+    // --- per-job options (seeded from AppPreferences on each drop) ---
 
     var options = StartOptions(output: "")
 
@@ -258,6 +266,16 @@ final class AppState {
         }
     }
 
+    /// Persist the current `AppPreferences` to disk. Called by the Settings
+    /// window's Detection and Output tabs on every field change.
+    func savePreferences() {
+        do {
+            try preferences.save()
+        } catch {
+            errorMessage = "Could not save preferences: \(error.localizedDescription)"
+        }
+    }
+
     /// Tear down and recreate the SidecarClient. Called by the error
     /// banner's "Restart sidecar" button.
     func restartSidecar() {
@@ -301,13 +319,21 @@ final class AppState {
         do {
             let md = try await sidecar.getMetadata(path: url)
             metadata = md
-            screen = .settings
+            // Stay on .drop; DropZoneView switches to its "ready to cut"
+            // state when metadata is non-nil.
         } catch {
             errorMessage = "Could not read \(url.lastPathComponent): \(error.localizedDescription)"
         }
     }
 
     func startProcessing() async {
+        guard config.hasRequiredSecrets else {
+            // Redirect to the Credentials tab in the Settings window rather
+            // than letting the sidecar fail silently without credentials.
+            settingsTab = .credentials
+            needsFirstRunConfig = true
+            return
+        }
         guard let input = droppedFile else { return }
 
         // Snapshot the current options into preferences so the next
