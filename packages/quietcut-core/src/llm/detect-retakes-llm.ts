@@ -25,6 +25,10 @@ const TOOL_NAME = "report_retakes";
 // even for many cuts); the headroom is for the model's reasoning.
 const MAX_OUTPUT_TOKENS = 32000;
 
+// Models that support adaptive thinking. All other models must omit the
+// `thinking` parameter entirely — passing it causes a 400 invalid_request_error.
+const ADAPTIVE_THINKING_MODELS = new Set(["claude-opus-4-8"]);
+
 // A real retake deletes roughly as much as it keeps (you said the line, then
 // said it again — we delete the earlier attempt[s] and keep one). The ratio of
 // deleted words to kept words stays low (≈1–3, a touch higher for 3–4 attempts).
@@ -232,16 +236,20 @@ async function requestRawCuts(
   model: string,
   messages: Anthropic.MessageParam[],
 ): Promise<RetakeCut[] | null> {
-  // Adaptive thinking (Opus 4.8 / Sonnet 4.6) materially improves this
-  // reasoning-heavy task, but it forbids forced tool_choice and a fixed
-  // temperature. So we use tool_choice "auto" (the prompt still instructs the
-  // model to always call report_retakes) and omit temperature. The `thinking`
-  // and (optional) effort fields aren't typed by the installed SDK version, so
-  // the params object is cast; the SDK forwards them in the request body.
+  // Adaptive thinking materially improves this reasoning-heavy task but is only
+  // supported on select models (see ADAPTIVE_THINKING_MODELS). When enabled it
+  // also forbids forced tool_choice and a fixed temperature, so we use
+  // tool_choice "auto" (the prompt still instructs the model to always call
+  // report_retakes) and omit temperature. The `thinking` field isn't typed by
+  // the installed SDK version, so the params object is cast; the SDK forwards
+  // it in the request body.
+  const thinkingParam = ADAPTIVE_THINKING_MODELS.has(model)
+    ? { thinking: { type: "adaptive" } }
+    : {};
   const params = {
     model,
     max_tokens: MAX_OUTPUT_TOKENS,
-    thinking: { type: "adaptive" },
+    ...thinkingParam,
     system: SYSTEM_PROMPT,
     tools: [
       {
