@@ -1,9 +1,10 @@
 import SwiftUI
 
-/// Root view. Switches between the six screens declared in `AppState.Screen`.
-/// Owns a single `AppState` for the whole window.
+/// Root view. Switches between the screens declared in `AppState.Screen`.
+/// `AppState` is owned by `SmartCutApp` and injected into the environment
+/// so the `Settings {}` scene can share the same instance.
 struct ContentView: View {
-    @State private var appState = AppState()
+    @Environment(AppState.self) private var appState
 
     var body: some View {
         ZStack(alignment: .top) {
@@ -17,7 +18,6 @@ struct ContentView: View {
             }
         }
         .animation(.easeInOut(duration: 0.18), value: appState.errorMessage)
-        .environment(appState)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Theme.canvas)
         .sheet(
@@ -38,8 +38,6 @@ struct ContentView: View {
         switch appState.screen {
         case .drop:
             DropZoneView()
-        case .settings:
-            SettingsView()
         case .running:
             PipelineRunningView()
         case .review:
@@ -54,5 +52,6 @@ struct ContentView: View {
 
 #Preview {
     ContentView()
+        .environment(AppState())
         .frame(width: 960, height: 640)
 }
