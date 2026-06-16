@@ -37,8 +37,15 @@ struct ReviewCutState: Identifiable, Sendable {
     let op: RemoveRetakeOp?
     let source: CutSource
     var enabled: Bool
-    var removeStartIndex: Int  // inclusive transcript token index
-    var removeEndIndex: Int  // inclusive transcript token index
+    var removeStartIndex: Int  // inclusive transcript token index (current, may be dragged)
+    var removeEndIndex: Int    // inclusive transcript token index (current, may be dragged)
+    /// The proposal's original word indices, frozen at `reviewReady`. Used to
+    /// detect whether the user has dragged the handles — if the current indices
+    /// still match these, the silence-snapped `op.start`/`op.end` are used for
+    /// preview boundaries (matching what the renderer does). If they differ,
+    /// word-onset times are used instead.
+    let originalStartIndex: Int
+    let originalEndIndex: Int
     var id: String { opId }
 }
 
@@ -154,10 +161,28 @@ final class AppState {
     /// `extractEditedPreview`. When `including` is supplied, that cut is always
     /// included even if it is currently disabled (used to preview a disabled cut
     /// as if it were applied).
+    ///
+    /// Mirrors `applyReviewResult`'s boundary logic so preview and render agree:
+    /// - AI cut, boundaries unchanged → use silence-snapped `op.start`/`op.end`
+    /// - AI cut, boundaries dragged   → use word-onset times
+    /// - Manual cut                   → use word-onset times (no `op` to snap to)
     func cutsAsSegments(including forcedOpId: String? = nil) -> [Segment] {
         reviewCuts.compactMap { cut in
             guard cut.enabled || cut.opId == forcedOpId else { return nil }
-            let (start, end) = sourceTimes(for: cut)
+            let start: Double
+            let end: Double
+            let boundariesUnchanged = cut.removeStartIndex == cut.originalStartIndex
+                && cut.removeEndIndex == cut.originalEndIndex
+            if let op = cut.op, boundariesUnchanged {
+                // Unmodified AI cut: use the original silence-snapped times,
+                // exactly as the renderer does.
+                start = op.start
+                end = op.end
+            } else {
+                // Dragged AI cut or manual cut: derive times from current word
+                // indices, same as applyReviewResult's rangeBounds.
+                (start, end) = sourceTimes(for: cut)
+            }
             guard end > start else { return nil }
             return Segment(start: start, end: end)
         }
@@ -396,7 +421,9 @@ final class AppState {
                 source: .manual,
                 enabled: true,
                 removeStartIndex: lo,
-                removeEndIndex: hi
+                removeEndIndex: hi,
+                originalStartIndex: lo,
+                originalEndIndex: hi
             )
         )
         survivors.sort { $0.removeStartIndex < $1.removeStartIndex }
@@ -534,7 +561,9 @@ final class AppState {
                     source: .ai,
                     enabled: true,
                     removeStartIndex: $0.removeStartIndex,
-                    removeEndIndex: $0.removeEndIndex
+                    removeEndIndex: $0.removeEndIndex,
+                    originalStartIndex: $0.removeStartIndex,
+                    originalEndIndex: $0.removeEndIndex
                 )
             }
             awaitingReviewConfirmation = proposals.isEmpty
