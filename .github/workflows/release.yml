@@ -108,7 +108,11 @@ jobs:
 
       - name: Notarize app
         run: |
-          xcrun notarytool submit "$RUNNER_TEMP/export/SmartCut.app" \
+          # notarytool requires a zip, pkg, or dmg — not a raw .app bundle.
+          ditto -c -k --keepParent \
+            "$RUNNER_TEMP/export/SmartCut.app" \
+            "$RUNNER_TEMP/SmartCut.app.zip"
+          xcrun notarytool submit "$RUNNER_TEMP/SmartCut.app.zip" \
             --key "$RUNNER_TEMP/private_keys/AuthKey_${{ secrets.AC_API_KEY_ID }}.p8" \
             --key-id "${{ secrets.AC_API_KEY_ID }}" \
             --issuer "${{ secrets.AC_API_ISSUER_ID }}" \
