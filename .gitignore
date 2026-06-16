@@ -24,3 +24,7 @@ xcuserdata/
 
 # Fixtures opt-in: explicitly track these if added later
 !packages/quietcut-core/__fixtures__/*.mp4
+
+# Agent tooling
+.agents/
+skills-lock.json
