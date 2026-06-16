@@ -32,8 +32,11 @@ jobs:
       - name: Install Node dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Build sidecar
-        run: pnpm --filter quietcut-server build
+      - name: Build TypeScript workspace
+        # Build all packages in dependency order (core → cli/server).
+        # quietcut-server depends on quietcut-core's dist output, so a full
+        # workspace build is required rather than filtering to server alone.
+        run: pnpm build
 
       - name: Install build tools
         run: brew install xcodegen create-dmg
