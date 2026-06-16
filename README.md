@@ -41,7 +41,7 @@ brew install node ffmpeg whisper-cpp
 
 1. Download the latest `SmartCut.dmg` using the button above, or from the [releases page](https://github.com/jamesqquick/SmartCut/releases/latest).
 2. Open the DMG and drag **SmartCut** into your Applications folder.
-3. Launch SmartCut. On first launch, macOS may warn that the app is from an unidentified developer — right-click the app and choose **Open**, or allow it under **System Settings → Privacy & Security**.
+3. Launch SmartCut. On first launch, Gatekeeper may ask for confirmation — click **Open**.
 4. Complete the **first-run setup sheet** (credentials are saved to `~/.smartcut/config.json`).
 
 ## Setup: Cloudflare AI Gateway

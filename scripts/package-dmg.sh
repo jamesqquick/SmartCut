@@ -17,11 +17,18 @@ if ! command -v create-dmg &>/dev/null; then
   exit 1
 fi
 
+ICNS="${APP_PATH}/Contents/Resources/AppIcon.icns"
+if [ ! -f "$ICNS" ]; then
+  echo "error: AppIcon.icns not found at ${ICNS}" >&2
+  echo "       Make sure the app was built in Release configuration with assets compiled." >&2
+  exit 1
+fi
+
 echo "Packaging SmartCut v${VERSION} → ${DMG_PATH}"
 
 create-dmg \
   --volname "SmartCut ${VERSION}" \
-  --volicon "${APP_PATH}/Contents/Resources/AppIcon.icns" \
+  --volicon "$ICNS" \
   --window-pos 200 120 \
   --window-size 660 400 \
   --icon-size 128 \

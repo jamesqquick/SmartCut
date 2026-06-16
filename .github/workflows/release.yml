@@ -18,6 +18,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Select Xcode
+        # Pin explicitly — macos-14 default is 15.4 but this guards against image updates.
         run: sudo xcode-select -s /Applications/Xcode_15.4.app
 
       - name: Enable Corepack
@@ -63,7 +64,8 @@ jobs:
             -k "$KEYCHAIN_PATH"
           security set-key-partition-list \
             -S apple-tool:,apple: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
-          security list-keychain -d user -s "$KEYCHAIN_PATH"
+          # Preserve login.keychain-db in the search list alongside the new one.
+          security list-keychain -d user -s "$KEYCHAIN_PATH" login.keychain-db
 
       # --- Build and export ---
 
@@ -81,10 +83,14 @@ jobs:
 
       - name: Export archive
         run: |
+          # Substitute the team ID into ExportOptions.plist — xcodebuild does not
+          # expand $(VAR) syntax in plist files passed to -exportArchive.
+          sed "s/\$(APPLE_TEAM_ID)/${{ secrets.APPLE_TEAM_ID }}/g" \
+            app/SmartCut/ExportOptions.plist > "$RUNNER_TEMP/ExportOptions.plist"
           xcodebuild -exportArchive \
             -archivePath "$RUNNER_TEMP/SmartCut.xcarchive" \
             -exportPath "$RUNNER_TEMP/export" \
-            -exportOptionsPlist app/SmartCut/ExportOptions.plist
+            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist"
 
       # --- Notarization ---
 
@@ -120,6 +126,11 @@ jobs:
             "$RUNNER_TEMP/export/SmartCut.app" \
             "$RUNNER_TEMP/SmartCut.dmg" \
             "${{ steps.version.outputs.VERSION }}"
+
+      - name: Sign DMG
+        run: |
+          codesign --force --sign "Developer ID Application" \
+            "$RUNNER_TEMP/SmartCut.dmg"
 
       - name: Notarize DMG
         run: |

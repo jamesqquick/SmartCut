@@ -28,6 +28,8 @@ echo "Bumping version to ${NEW_VERSION}"
 
 # --- project.yml ---
 PROJECT_YML="${REPO_ROOT}/app/SmartCut/project.yml"
+grep -q 'CFBundleShortVersionString:' "$PROJECT_YML" \
+  || { echo "error: CFBundleShortVersionString not found in project.yml" >&2; exit 1; }
 sed -i '' \
   "s/CFBundleShortVersionString: \"[^\"]*\"/CFBundleShortVersionString: \"${NEW_VERSION}\"/" \
   "$PROJECT_YML"
@@ -42,6 +44,8 @@ PACKAGE_FILES=(
 )
 
 for PKG in "${PACKAGE_FILES[@]}"; do
+  grep -q '"version":' "$PKG" \
+    || { echo "error: \"version\" field not found in ${PKG#"$REPO_ROOT/"}" >&2; exit 1; }
   sed -i '' \
     "s/\"version\": \"[^\"]*\"/\"version\": \"${NEW_VERSION}\"/" \
     "$PKG"
