@@ -36,12 +36,19 @@ open app/SmartCut/SmartCut.xcodeproj
 - `SmartCut/Util/` — `AudioPlayer`, formatters
 - `SmartCut/Assets.xcassets` — app icon + accent color
 
-## Sandboxing
+## Sandboxing and signing
 
-The app is **unsandboxed**. We need to spawn `node` and read arbitrary
-user files, which the sandbox blocks. See `SmartCut.entitlements`.
-This is fine for personal use; if SmartCut ever ships outside this
-machine, expect to redesign the sidecar handshake.
+The app is **unsandboxed** (`app-sandbox: false`). Spawning `node`, `ffmpeg`,
+and `whisper-cli` as child processes requires this — the sandbox blocks
+arbitrary process execution.
+
+For local development, code signing is disabled (Debug configuration).
+Release builds use **Developer ID Application** signing with hardened runtime
+enabled, which is required for notarization. Spawning external processes is
+allowed under hardened runtime because each child process carries its own
+signature and runs in its own address space.
+
+See `docs/RELEASING.md` in the repo root for the full distribution process.
 
 ## Regenerating the project
 
