@@ -1,0 +1,521 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SmartCut — Audio Preview of Edited Sections (Mockup)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  /* Design tokens lifted from docs/ui-mockup.html so this matches the app. */
+  :root {
+    --font-sans: "Manrope", "Inter", ui-sans-serif, -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+    --font-mono: "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+
+    --text-heading-lg: 32px; --tracking-heading-lg: -0.68px; --leading-heading-lg: 1.15;
+    --text-body: 15px;     --leading-body: 1.5;
+    --text-body-sm: 13px;  --leading-body-sm: 1.43;
+    --text-caption: 11px;  --tracking-caption: 0.12em;   --leading-caption: 1.33;
+
+    --radius: 6px;
+    --radius-pill: 9999px;
+
+    --iris: #5848f2;
+    --iris-hover: #6d5dff;
+    --lumen: #9aa0ff;
+    --teal: #19c8d6;
+    --teal-soft: #5fe0e8;
+
+    --shadow-float: rgba(50, 50, 93, 0.12) 0px 16px 32px 0px;
+  }
+
+  :root[data-theme="light"] {
+    --canvas: #e5edf5; --card: #f8fafd; --elevated: #ffffff; --wash: #e2e4ff;
+    --ink: #061b31; --body: #50617a; --muted: #64748d; --tertiary: #7d8ba4;
+    --border: #d7e0eb; --border-strong: #c2cedd;
+    --accent: var(--iris); --accent-text: #ffffff; --accent-wash: var(--wash);
+    --good: #5c9a12; --good-wash: rgba(129, 184, 26, 0.14);
+    --danger: #d23b2f; --danger-wash: rgba(210, 59, 47, 0.10); --danger-text: #b4322a;
+    --warn: #b8860b;
+    --grad-title: linear-gradient(96deg, var(--iris) 0%, var(--teal) 100%);
+    --halo: radial-gradient(120% 120% at 100% 0%, rgba(88,72,242,0.42) 0%, rgba(25,200,214,0.24) 34%, rgba(229,237,245,0) 68%);
+  }
+
+  :root[data-theme="dark"] {
+    --canvas: #0a0e1a; --card: #121826; --elevated: #1a2233; --wash: rgba(83, 58, 253, 0.16);
+    --ink: #f0f3f9; --body: #aab6c8; --muted: #7d8ba4; --tertiary: #64748d;
+    --border: rgba(255, 255, 255, 0.08); --border-strong: rgba(255, 255, 255, 0.16);
+    --accent: var(--iris); --accent-text: #ffffff; --accent-wash: rgba(83, 58, 253, 0.18);
+    --good: #9ad13a; --good-wash: rgba(129, 184, 26, 0.14);
+    --danger: #ff6b60; --danger-wash: rgba(255, 69, 58, 0.12); --danger-text: #ff8a80;
+    --warn: #ffcf5e;
+    --grad-title: linear-gradient(96deg, var(--lumen) 0%, var(--teal-soft) 100%);
+    --halo: radial-gradient(120% 120% at 100% 0%, rgba(88,72,242,0.40) 0%, rgba(25,200,214,0.20) 36%, rgba(10,14,26,0) 72%);
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0; padding: 0;
+    background:
+      radial-gradient(60% 50% at 50% 0%, rgba(88,72,242,0.06), transparent 70%),
+      var(--page-bg, #06080f);
+    color: var(--ink);
+    font: 400 var(--text-body)/var(--leading-body) var(--font-sans);
+    font-feature-settings: "ss01" on, "tnum" on;
+    -webkit-font-smoothing: antialiased;
+    min-height: 100vh;
+  }
+  :root[data-theme="light"] body { --page-bg: #cdd9e6; }
+
+  /* ---------------- Toolbar ---------------- */
+  .toolbar {
+    max-width: 1080px; margin: 32px auto 16px; padding: 0 24px;
+    display: flex; gap: 8px; flex-wrap: wrap; align-items: center;
+  }
+  .toolbar-label {
+    color: var(--muted); font-size: var(--text-caption);
+    text-transform: uppercase; letter-spacing: var(--tracking-caption); margin-right: 4px;
+  }
+  .seg { display: inline-flex; background: rgba(127, 139, 164, 0.14); border-radius: var(--radius); padding: 3px; gap: 2px; }
+  .toolbar button {
+    background: transparent; color: var(--body); border: none; border-radius: var(--radius);
+    padding: 6px 12px; cursor: pointer; font: 400 var(--text-body-sm)/1 var(--font-sans);
+    transition: background 0.15s, color 0.15s;
+  }
+  .toolbar button:hover { color: var(--ink); }
+  .toolbar button.active { background: var(--accent); color: var(--accent-text); }
+  .toolbar .spacer { flex: 1; }
+
+  /* ---------------- Window chrome ---------------- */
+  .window {
+    max-width: 1080px; height: 720px; margin: 0 auto 24px;
+    background: var(--canvas); border: 1px solid var(--border); border-radius: var(--radius);
+    overflow: hidden; box-shadow: rgba(0, 0, 0, 0.35) 0px 24px 64px -12px;
+    display: grid; grid-template-rows: 40px 1fr;
+  }
+  .titlebar { background: var(--elevated); border-bottom: 1px solid var(--border); display: flex; align-items: center; padding: 0 14px; position: relative; }
+  .traffic { display: flex; gap: 8px; }
+  .traffic span { width: 12px; height: 12px; border-radius: var(--radius-pill); display: block; }
+  .traffic .r { background: #ff5f57; } .traffic .y { background: #febc2e; } .traffic .g { background: #28c840; }
+  .title { position: absolute; left: 0; right: 0; text-align: center; color: var(--muted); font-weight: 400; font-size: var(--text-body-sm); letter-spacing: -0.1px; pointer-events: none; }
+
+  /* ---------------- Layout ---------------- */
+  .screen { display: grid; height: 100%; grid-template-columns: 248px 1fr; }
+  aside { background: var(--card); border-right: 1px solid var(--border); padding: 20px 16px; overflow-y: auto; }
+  aside h3 { margin: 0 0 12px; font-size: var(--text-caption); font-weight: 400; text-transform: uppercase; color: var(--muted); letter-spacing: var(--tracking-caption); }
+  aside h3.spaced { margin-top: 28px; }
+
+  .step { display: flex; gap: 10px; align-items: center; padding: 8px 10px; border-radius: var(--radius); margin-bottom: 2px; }
+  .step.active { background: var(--accent-wash); }
+  .step .dot { width: 9px; height: 9px; border-radius: var(--radius-pill); background: var(--border-strong); flex-shrink: 0; }
+  .step.done .dot { background: var(--good); }
+  .step.active .dot { background: var(--accent); animation: pulse 1.7s infinite; }
+  .step.fail .dot { background: var(--danger); }
+  @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(88,72,242,0.45);} 70% { box-shadow: 0 0 0 7px rgba(88,72,242,0);} 100% { box-shadow: 0 0 0 0 rgba(88,72,242,0);} }
+  .step .label { flex: 1; font-size: var(--text-body-sm); color: var(--ink); }
+  .step:not(.active):not(.done) .label { color: var(--muted); }
+  .step .label .meta { color: var(--muted); font-size: var(--text-caption); margin-top: 2px; }
+
+  .stat-row { display: flex; justify-content: space-between; align-items: center; padding: 5px 10px; }
+  .stat-row .k { color: var(--muted); font-size: var(--text-caption); }
+  .stat-row .v { font-size: var(--text-caption); font-weight: 500; color: var(--ink); font-variant-numeric: tabular-nums; }
+  .stat-row .v.good { color: var(--good); }
+
+  /* ---------------- Content ---------------- */
+  section.content { display: flex; flex-direction: column; min-height: 0; }
+  .head-pad { padding: 28px 36px 16px; }
+  .eyebrow { font-size: var(--text-caption); text-transform: uppercase; letter-spacing: var(--tracking-caption); color: var(--muted); margin: 0 0 6px; }
+  h2.title-gradient {
+    margin: 0 0 8px; font-size: var(--text-heading-lg); font-weight: 300; line-height: var(--leading-heading-lg);
+    letter-spacing: var(--tracking-heading-lg); background: var(--grad-title);
+    -webkit-background-clip: text; background-clip: text; color: transparent; width: fit-content;
+  }
+  .subtitle { color: var(--body); font-size: var(--text-body-sm); margin: 0; max-width: 72ch; }
+  .subtitle kbd, kbd {
+    background: var(--elevated); border: 1px solid var(--border-strong); border-bottom-width: 2px;
+    border-radius: var(--radius); padding: 1px 6px; font-size: 10.5px; color: var(--body);
+    font-family: var(--font-mono); line-height: 1.4; display: inline-block;
+  }
+
+  .head-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+  .head-actions { display: flex; gap: 10px; flex-shrink: 0; }
+
+  /* ---------------- Buttons ---------------- */
+  .btn {
+    padding: 9px 16px; border-radius: var(--radius); border: 1px solid var(--border-strong);
+    background: var(--elevated); color: var(--ink); cursor: pointer; font: 400 var(--text-body-sm)/1 var(--font-sans);
+    transition: background 0.15s, border-color 0.15s, color 0.15s; display: inline-flex; align-items: center; gap: 8px;
+  }
+  .btn:hover { background: var(--wash); }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
+  .btn.primary:hover { background: var(--iris-hover); }
+  .btn.secondary { background: transparent; border-color: var(--ink); color: var(--ink); }
+  .btn.secondary:hover { background: var(--ink); color: var(--canvas); }
+
+  /* ---------------- Cut strip ---------------- */
+  .cut-strip { display: flex; gap: 10px; padding: 0 36px 14px; overflow-x: auto; }
+  .chip {
+    flex-shrink: 0; width: 188px; padding: 10px; border-radius: var(--radius);
+    background: var(--card); border: 1px solid var(--border);
+    display: flex; flex-direction: column; gap: 6px;
+  }
+  .chip.active { background: var(--wash); border-color: var(--accent); }
+  .chip.disabled { opacity: 0.55; }
+  .chip-top { display: flex; align-items: center; gap: 6px; }
+  .chip-title { font-size: var(--text-body-sm); font-weight: 600; color: var(--ink); }
+  .chip.disabled .chip-title { color: var(--muted); }
+  .chip-spacer { flex: 1; }
+
+  /* the new preview button */
+  .preview-btn {
+    width: 24px; height: 24px; border-radius: var(--radius); border: 1px solid var(--border-strong);
+    background: var(--elevated); color: var(--accent); cursor: pointer;
+    display: inline-flex; align-items: center; justify-content: center; padding: 0; flex-shrink: 0;
+    transition: background 0.15s, border-color 0.15s;
+  }
+  .preview-btn:hover { background: var(--wash); border-color: var(--accent); }
+  .preview-btn.playing { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
+  .preview-btn svg { width: 11px; height: 11px; }
+  .preview-btn .spin {
+    width: 12px; height: 12px; border: 2px solid var(--border-strong);
+    border-top-color: var(--accent); border-radius: var(--radius-pill); animation: spin 0.7s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* mini delete (manual cuts) */
+  .chip-x { width: 16px; height: 16px; display: inline-flex; align-items: center; justify-content: center; color: var(--muted); cursor: pointer; border: none; background: transparent; }
+  .chip-x:hover { color: var(--ink); }
+
+  /* toggle */
+  .toggle { position: relative; width: 28px; height: 16px; flex-shrink: 0; }
+  .toggle input { display: none; }
+  .toggle .track { position: absolute; inset: 0; border-radius: var(--radius-pill); background: var(--border-strong); transition: background 0.15s; }
+  .toggle .knob { position: absolute; top: 2px; left: 2px; width: 12px; height: 12px; border-radius: var(--radius-pill); background: #fff; transition: left 0.15s; }
+  .toggle input:checked + .track { background: var(--accent); }
+  .toggle input:checked + .track + .knob { left: 14px; }
+
+  .chip-source { font-size: var(--text-caption); }
+  .chip-source.ai { color: var(--muted); }
+  .chip-source .manual-tag { display: inline-block; color: var(--accent); background: var(--wash); border-radius: var(--radius-pill); padding: 2px 6px; font-weight: 600; letter-spacing: 0.4px; text-transform: uppercase; font-size: 9px; }
+  .chip-removed { font-size: 10px; font-weight: 500; color: var(--danger-text); }
+  .chip.disabled .chip-removed { color: var(--muted); }
+
+  /* now-playing inline waveform under an active chip */
+  .chip-wave { display: flex; align-items: center; gap: 2px; height: 12px; margin-top: 2px; }
+  .chip-wave span { width: 2px; background: var(--accent); border-radius: 1px; display: inline-block; animation: eq 0.9s ease-in-out infinite; }
+  @keyframes eq { 0%,100% { height: 3px; } 50% { height: 11px; } }
+
+  .divider { height: 1px; background: var(--border); }
+
+  /* ---------------- Transcript ---------------- */
+  .tx-wrap { flex: 1; overflow-y: auto; padding: 24px 36px; }
+  .tx { line-height: 2.1; font-size: var(--text-body); color: var(--ink); }
+  .tx w { display: inline; padding: 1px 2px; border-radius: 4px; }
+  .tx w.cut { color: var(--danger-text); text-decoration: line-through; text-decoration-color: var(--danger); background: rgba(255,69,58,0.10); }
+  .tx w.cut.active { background: rgba(255,69,58,0.20); }
+
+  /* preview window explainer (popover-ish callout) */
+  .explainer {
+    margin: 0 36px 20px; background: var(--elevated); border: 1px solid var(--border);
+    border-left: 2px solid var(--accent); border-radius: var(--radius); padding: 14px 16px; box-shadow: var(--shadow-float);
+  }
+  .explainer .e-title { font-size: var(--text-body-sm); font-weight: 600; color: var(--ink); margin-bottom: 10px; display: flex; align-items: center; gap: 8px; }
+  .explainer .e-title svg { width: 14px; height: 14px; color: var(--accent); }
+  .timeline { display: flex; align-items: stretch; height: 34px; border-radius: var(--radius); overflow: hidden; border: 1px solid var(--border); }
+  .timeline .seg-keep { background: var(--good-wash); border-right: 1px solid var(--border); flex: 1; display: flex; align-items: center; justify-content: center; }
+  .timeline .seg-keep .lab { font-size: 10px; color: var(--good); font-family: var(--font-mono); }
+  .timeline .seg-cut { background: var(--danger-wash); border-right: 1px solid var(--border); display: flex; align-items: center; justify-content: center; }
+  .timeline .seg-cut .lab { font-size: 9px; color: var(--danger-text); font-family: var(--font-mono); text-decoration: line-through; }
+  .timeline .seg-keep:last-child, .timeline .seg-cut:last-child { border-right: none; }
+  .e-legend { display: flex; gap: 18px; margin-top: 10px; font-size: var(--text-caption); color: var(--muted); }
+  .e-legend .sw { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: middle; }
+  .e-legend .sw.keep { background: var(--good); } .e-legend .sw.cut { background: var(--danger); }
+  .e-note { font-size: var(--text-caption); color: var(--tertiary); margin-top: 10px; line-height: 1.5; }
+
+  svg.ic { stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .footnote { color: var(--tertiary); font-size: var(--text-caption); margin: 0 0 40px; text-align: center; }
+</style>
+</head>
+<body>
+
+<div class="toolbar">
+  <span class="toolbar-label">Explainer</span>
+  <div class="seg" id="explain-seg">
+    <button data-explain="on" class="active">Show</button>
+    <button data-explain="off">Hide</button>
+  </div>
+  <span class="toolbar-label" style="margin-left:8px">Theme</span>
+  <div class="seg" id="theme-seg">
+    <button data-theme-btn="light">Light</button>
+    <button data-theme-btn="dark" class="active">Dark</button>
+  </div>
+</div>
+
+<div class="window">
+  <div class="titlebar">
+    <div class="traffic"><span class="r"></span><span class="y"></span><span class="g"></span></div>
+    <div class="title">SmartCut — interview.mp4 — Review</div>
+    <div style="width:60px"></div>
+  </div>
+
+  <main class="screen">
+    <aside>
+      <h3>Pipeline</h3>
+      <div class="step done"><div class="dot"></div><div class="label">File loaded</div></div>
+      <div class="step done"><div class="dot"></div><div class="label">Audio extracted</div></div>
+      <div class="step done"><div class="dot"></div><div class="label">Silence detected<div class="meta">47 regions</div></div></div>
+      <div class="step done"><div class="dot"></div><div class="label">Transcribed<div class="meta">1,842 words</div></div></div>
+      <div class="step done"><div class="dot"></div><div class="label">Retakes detected<div class="meta">12 proposals</div></div></div>
+      <div class="step active"><div class="dot"></div><div class="label">Review</div></div>
+      <div class="step"><div class="dot"></div><div class="label">Render</div></div>
+
+      <h3 class="spaced">Review</h3>
+      <div class="stat-row"><span class="k">Cuts enabled</span><span class="v">10 / 12</span></div>
+      <div class="stat-row"><span class="k">Est. time saved</span><span class="v good">38.2s</span></div>
+      <div class="stat-row"><span class="k">Words</span><span class="v">1,842</span></div>
+    </aside>
+
+    <section class="content">
+      <div class="head-pad">
+        <div class="head-row">
+          <div>
+            <p class="eyebrow">Review</p>
+            <h2 class="title-gradient">Review cuts</h2>
+            <p class="subtitle">
+              Click a word then Shift-click another to cut that range. Select a cut to drag its handles
+              (or use <kbd>←</kbd> <kbd>→</kbd>, <kbd>⌥←</kbd> <kbd>⌥→</kbd>). Press a cut's
+              <kbd>▶</kbd> to hear 2.5s before + 2.5s after, stitched exactly as it will render.
+            </p>
+          </div>
+          <div class="head-actions">
+            <button class="btn secondary">Cancel</button>
+            <button class="btn primary">Apply 10 cuts</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Cut strip: each chip now carries a play/stop/loading preview button -->
+      <div class="cut-strip" id="cut-strip">
+        <!-- Active AI cut — this one drives the state toggle -->
+        <div class="chip active" data-driver="true">
+          <div class="chip-top">
+            <span class="chip-title">Cut 1</span>
+            <span class="chip-spacer"></span>
+            <button class="preview-btn" title="Preview this cut" aria-label="Preview this cut">
+              <svg class="ic" viewBox="0 0 24 24"><polygon points="6 4 20 12 6 20 6 4" fill="currentColor" stroke="none"/></svg>
+            </button>
+            <label class="toggle"><input type="checkbox" checked><span class="track"></span><span class="knob"></span></label>
+          </div>
+          <div class="chip-source ai">86% confidence</div>
+          <div class="chip-removed">3.9s removed</div>
+          <div class="chip-wave" style="display:none">
+            <span style="animation-delay:0s"></span><span style="animation-delay:.1s"></span>
+            <span style="animation-delay:.2s"></span><span style="animation-delay:.3s"></span>
+            <span style="animation-delay:.15s"></span><span style="animation-delay:.05s"></span>
+            <span style="animation-delay:.25s"></span><span style="animation-delay:.12s"></span>
+            <span style="animation-delay:.18s"></span><span style="animation-delay:.08s"></span>
+          </div>
+        </div>
+
+        <!-- Another AI cut -->
+        <div class="chip">
+          <div class="chip-top">
+            <span class="chip-title">Cut 2</span>
+            <span class="chip-spacer"></span>
+            <button class="preview-btn" title="Preview this cut" aria-label="Preview this cut">
+              <svg class="ic" viewBox="0 0 24 24"><polygon points="6 4 20 12 6 20 6 4" fill="currentColor" stroke="none"/></svg>
+            </button>
+            <label class="toggle"><input type="checkbox" checked><span class="track"></span><span class="knob"></span></label>
+          </div>
+          <div class="chip-source ai">72% confidence</div>
+          <div class="chip-removed">2.8s removed</div>
+        </div>
+
+        <!-- Manual cut: has delete affordance + preview button -->
+        <div class="chip">
+          <div class="chip-top">
+            <span class="chip-title">Cut 3</span>
+            <span class="chip-spacer"></span>
+            <button class="chip-x" title="Delete this cut" aria-label="Delete this cut">
+              <svg class="ic" viewBox="0 0 24 24" style="width:9px;height:9px;stroke-width:2.5"><path d="M5 5l14 14M19 5L5 19"/></svg>
+            </button>
+            <button class="preview-btn" title="Preview this cut" aria-label="Preview this cut">
+              <svg class="ic" viewBox="0 0 24 24"><polygon points="6 4 20 12 6 20 6 4" fill="currentColor" stroke="none"/></svg>
+            </button>
+            <label class="toggle"><input type="checkbox" checked><span class="track"></span><span class="knob"></span></label>
+          </div>
+          <div class="chip-source"><span class="manual-tag">Manual</span></div>
+          <div class="chip-removed">1.1s removed</div>
+        </div>
+
+        <!-- Disabled cut: preview still available so you can compare keeping vs cutting -->
+        <div class="chip disabled">
+          <div class="chip-top">
+            <span class="chip-title">Cut 4</span>
+            <span class="chip-spacer"></span>
+            <button class="preview-btn" title="Preview this cut" aria-label="Preview this cut">
+              <svg class="ic" viewBox="0 0 24 24"><polygon points="6 4 20 12 6 20 6 4" fill="currentColor" stroke="none"/></svg>
+            </button>
+            <label class="toggle"><input type="checkbox"><span class="track"></span><span class="knob"></span></label>
+          </div>
+          <div class="chip-source ai">64% confidence</div>
+          <div class="chip-removed">2.3s removed</div>
+        </div>
+
+        <div class="chip">
+          <div class="chip-top">
+            <span class="chip-title">Cut 5</span>
+            <span class="chip-spacer"></span>
+            <button class="preview-btn" title="Preview this cut" aria-label="Preview this cut">
+              <svg class="ic" viewBox="0 0 24 24"><polygon points="6 4 20 12 6 20 6 4" fill="currentColor" stroke="none"/></svg>
+            </button>
+            <label class="toggle"><input type="checkbox" checked><span class="track"></span><span class="knob"></span></label>
+          </div>
+          <div class="chip-source ai">91% confidence</div>
+          <div class="chip-removed">1.4s removed</div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <!-- Explainer: what "faithful 5s + 5s" actually plays -->
+      <div class="explainer" id="explainer" style="margin-top:20px">
+        <div class="e-title">
+          <svg class="ic" viewBox="0 0 24 24"><path d="M11 5 6 9H2v6h4l5 4V5zM15.5 8.5a5 5 0 0 1 0 7M19 5a9 9 0 0 1 0 14"/></svg>
+          Preview of Cut 1 — what you'll hear
+        </div>
+        <div class="timeline">
+          <div class="seg-keep" style="flex:2.2"><span class="lab">…walked through the setup,</span></div>
+          <div class="seg-cut" style="flex:1.1"><span class="lab">silence 0.5s</span></div>
+          <div class="seg-keep" style="flex:1.4"><span class="lab">so the way you</span></div>
+          <div class="seg-cut" style="flex:1.6"><span class="lab">uh, the way you'd… let me redo</span></div>
+          <div class="seg-keep" style="flex:3.6"><span class="lab">the way you configure this is by editing wrangler.jsonc…</span></div>
+        </div>
+        <div class="e-legend">
+          <span><span class="sw keep"></span>Kept audio you'll hear</span>
+          <span><span class="sw cut"></span>Removed (this cut, neighbors &amp; silence)</span>
+        </div>
+        <div class="e-note">
+          The window spans 2.5s before the cut start and 2.5s after the cut end, but plays only what survives the
+          final render — this cut, any neighboring cuts, silence trims, and lead-in/tail-out padding all applied.
+          What you hear is exactly the exported boundary.
+        </div>
+      </div>
+
+      <div class="tx-wrap">
+        <div class="tx">
+          So today we&#39;re going to <w>walk</w> <w>through</w> <w>the</w> <w>setup,</w>
+          <w class="cut active">so</w> <w class="cut active">the</w> <w class="cut active">way</w> <w class="cut active">you&#39;d</w>
+          <w class="cut active">uh,</w> <w class="cut active">the</w> <w class="cut active">way</w> <w class="cut active">you&#39;d</w>
+          <w class="cut active">configure</w> <w class="cut active">this</w> <w class="cut active">is</w>
+          <w class="cut active">—</w> <w class="cut active">wait</w> <w class="cut active">let</w> <w class="cut active">me</w>
+          <w class="cut active">say</w> <w class="cut active">that</w> <w class="cut active">again</w>
+          <w>the</w> <w>way</w> <w>you</w> <w>configure</w> <w>this</w> <w>is</w> <w>by</w> <w>editing</w>
+          <w>wrangler.jsonc</w> <w>directly.</w> <w>Once</w> <w>that&#39;s</w> <w>saved,</w> <w>the</w> <w>deploy</w>
+          <w>picks</w> <w>it</w> <w>up</w> <w>automatically.</w> <w>And</w>
+          <w class="cut">so,</w> <w class="cut">and</w> <w class="cut">uh,</w> <w class="cut">and</w> <w class="cut">so</w> <w class="cut">the</w>
+          <w>next</w> <w>thing</w> <w>we&#39;ll</w> <w>look</w> <w>at</w> <w>is</w> <w>environment</w> <w>variables,</w>
+          <w>which</w> <w>live</w> <w>in</w> <w>a</w> <w>separate</w> <w>file.</w>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<p class="footnote">SmartCut — audio preview of edited sections · click any ▶ button on a cut chip to simulate playback</p>
+
+<script>
+  const PLAY_SVG = `<svg class="ic" viewBox="0 0 24 24"><polygon points="6 4 20 12 6 20 6 4" fill="currentColor" stroke="none"/></svg>`;
+  const STOP_SVG = `<svg class="ic" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="1.5" fill="currentColor" stroke="none"/></svg>`;
+  const SPIN_HTML = `<span class="spin"></span>`;
+
+  // Simulated preview duration in ms (mimics the ~300 ms sidecar round-trip + ffmpeg extract)
+  const FAKE_LOAD_MS = 800;
+  const FAKE_PLAY_MS = 5000; // ~2.5s before + 2.5s after clip
+
+  let activeTimer = null;
+
+  // Track per-button state: 'idle' | 'loading' | 'playing'
+  const btnState = new Map();
+
+  function setButtonState(btn, chip, state) {
+    // Clear any running timer for this button
+    if (btn._timer) { clearTimeout(btn._timer); btn._timer = null; }
+
+    const wave = chip.querySelector('.chip-wave');
+    btn.classList.remove('playing');
+    btnState.set(btn, state);
+
+    if (state === 'idle') {
+      btn.innerHTML = PLAY_SVG;
+      btn.title = 'Preview this cut';
+      if (wave) wave.style.display = 'none';
+
+    } else if (state === 'loading') {
+      btn.innerHTML = SPIN_HTML;
+      btn.title = 'Loading preview…';
+      if (wave) wave.style.display = 'none';
+
+      // After simulated load time → jump to playing
+      btn._timer = setTimeout(() => setButtonState(btn, chip, 'playing'), FAKE_LOAD_MS);
+
+    } else if (state === 'playing') {
+      btn.classList.add('playing');
+      btn.innerHTML = STOP_SVG;
+      btn.title = 'Stop preview';
+      if (wave) wave.style.display = 'flex';
+
+      // After simulated clip duration → auto-return to idle
+      btn._timer = setTimeout(() => setButtonState(btn, chip, 'idle'), FAKE_PLAY_MS);
+    }
+  }
+
+  function stopAllExcept(exceptBtn) {
+    document.querySelectorAll('.preview-btn').forEach(btn => {
+      if (btn !== exceptBtn && btnState.get(btn) !== 'idle') {
+        const chip = btn.closest('.chip');
+        setButtonState(btn, chip, 'idle');
+      }
+    });
+  }
+
+  document.querySelectorAll('.preview-btn').forEach(btn => {
+    const chip = btn.closest('.chip');
+    btnState.set(btn, 'idle');
+
+    btn.addEventListener('click', e => {
+      e.stopPropagation(); // don't select the chip
+      const current = btnState.get(btn);
+      if (current === 'idle') {
+        stopAllExcept(btn);          // clicking one stops any other
+        setButtonState(btn, chip, 'loading');
+      } else {
+        // loading or playing → cancel/stop
+        setButtonState(btn, chip, 'idle');
+      }
+    });
+  });
+
+  // ---- Explainer toggle ----
+  const explainButtons = document.querySelectorAll('#explain-seg button');
+  const explainer = document.getElementById('explainer');
+  explainButtons.forEach(btn => btn.addEventListener('click', () => {
+    explainButtons.forEach(b => b.classList.toggle('active', b === btn));
+    explainer.style.display = btn.dataset.explain === 'on' ? '' : 'none';
+  }));
+
+  // ---- Theme toggle ----
+  const themeButtons = document.querySelectorAll('#theme-seg button');
+  themeButtons.forEach(btn => btn.addEventListener('click', () => {
+    document.documentElement.setAttribute('data-theme', btn.dataset.themeBtn);
+    themeButtons.forEach(b => b.classList.toggle('active', b === btn));
+  }));
+  if (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) {
+    document.querySelector('[data-theme-btn="light"]').click();
+  }
+</script>
+
+</body>
+</html>
