@@ -129,6 +129,38 @@ stitched preview` button.
 Output file lives at `$TMPDIR/smartcut-previews/stitched-<uuid>.wav` and
 uses the same 5-minute TTL as `extractClip`.
 
+### `extractEditedPreview`
+
+Render a faithful audio preview of a single cut boundary. The preview window is
+`[focusStart − padSec, focusEnd + tailSec]` in source time. Within that window
+the sidecar runs the same `planToKeepSegments` logic used at render time — applying
+all enabled cuts, silence removals, and lead-in/tail-out padding — then stitches
+only the surviving segments into a mono WAV. What the caller hears is exactly
+the audio the final export would contain across that boundary.
+
+- Params:
+  ```jsonc
+  {
+    "path": string,        // input media file
+    "duration": number,    // source duration in seconds
+    "focusStart": number,  // cut start in source seconds
+    "focusEnd": number,    // cut end / kept-resume in source seconds
+    "padSec": number?,     // seconds of context BEFORE focusStart (default 2.5)
+    "tailSec": number?,    // seconds of context AFTER focusEnd (default 2.5)
+    "leadInMs": number?,   // lead-in padding, must match render config (default 300)
+    "tailOutMs": number?,  // tail-out padding, must match render config (default 300)
+    "cuts": Segment[],     // enabled retake + manual cuts as {start,end} pairs
+    "silences": Segment[]  // silence regions as {start,end} pairs
+  }
+  ```
+- Returns: `{ "path": string, "durationSec": number }`
+- Errors: `invalidParams` (missing required fields, `focusEnd <= focusStart`,
+  non-finite numbers, or the entire window is removed by edits), `internalError`
+  (ffmpeg failure).
+
+Output file lives at `$TMPDIR/smartcut-previews/edited-preview-<uuid>.wav` and
+uses the same 5-minute TTL as `extractClip`.
+
 ### `start`
 
 Begin a smartcut run. Resolves **immediately** with an opaque job
@@ -181,6 +213,29 @@ in-order.
 - Returns: `{ "ok": true }`
 - Errors: `jobNotRunning` (-32002), `invalidParams`.
 
+### `submitReview`
+
+Submit the result of the batch transcript-review screen and allow rendering to
+proceed. Used by the app's `TranscriptReviewView` in place of per-cut `decide`
+calls. The server unblocks the generator with the full decision set, which it
+uses to build the final `EditPlan`.
+
+- Params:
+  ```jsonc
+  {
+    "cuts": [
+      {
+        "opId": string,
+        "enabled": boolean,
+        "removeStartIndex": number,  // inclusive transcript token index
+        "removeEndIndex": number     // inclusive transcript token index
+      }
+    ]
+  }
+  ```
+- Returns: `{ "ok": true }`
+- Errors: `jobNotRunning` (-32002), `invalidParams` (missing `cuts` array).
+
 ### `cancel`
 
 Abort the active job. Equivalent to sending a `cancel` decision: the
@@ -218,9 +273,14 @@ it in `Pipeline/PipelineEvent.swift`.
 
 ```
 probe ─▶ extract-audio ─▶ silence-coarse ─▶ silence-fine ─▶ transcribe ─▶ detect-retakes ─▶ review ─▶ render ─▶ done
-                                                                                                ▲
-                                                                  retakeProposed/decide loop ──┘
+                                                                                                          ▲
+                                                                              reviewReady/submitReview ───┘
 ```
+
+The app uses the **batch review flow** (`batchReview: true`): the pipeline pauses
+at `review`, emits one `reviewReady` event with the full transcript and all proposals,
+and waits for a single `submitReview` call. The per-cut `retakeProposed`/`decide`
+loop is the legacy CLI flow and is not used by the app.
 
 - `silence-fine` is best-effort; failure is non-fatal and emitted as a
   `done` status with `message: "Snap detection skipped."`.

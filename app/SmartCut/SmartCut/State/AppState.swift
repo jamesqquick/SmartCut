@@ -116,6 +116,9 @@ final class AppState {
     var transcript: [TranscriptToken] = []
     /// Editable per-cut state, chronologically ordered (mirrors the proposals).
     var reviewCuts: [ReviewCutState] = []
+    /// Silence regions detected during the pipeline run. Passed to the preview
+    /// RPC so the faithful preview can apply silence cuts within the window.
+    var silenceSegments: [Segment] = []
 
     var enabledCutCount: Int { reviewCuts.filter(\.enabled).count }
 
@@ -133,6 +136,31 @@ final class AppState {
         let start = transcript[s].start
         let end = e + 1 < transcript.count ? transcript[e + 1].start : transcript[e].end
         return max(0, end - start)
+    }
+
+    /// Source-time span for a cut derived from its current word boundaries.
+    /// Use this (not `op.start`/`op.end`) so dragged boundaries and manual
+    /// cuts (which have no `op`) are always correct.
+    func sourceTimes(for cut: ReviewCutState) -> (start: Double, end: Double) {
+        guard !transcript.isEmpty else { return (0, 0) }
+        let s = max(0, min(cut.removeStartIndex, transcript.count - 1))
+        let e = max(s, min(cut.removeEndIndex, transcript.count - 1))
+        let start = transcript[s].start
+        let end = e + 1 < transcript.count ? transcript[e + 1].start : transcript[e].end
+        return (start, end)
+    }
+
+    /// All enabled cuts mapped to source-time segments, suitable for passing to
+    /// `extractEditedPreview`. When `including` is supplied, that cut is always
+    /// included even if it is currently disabled (used to preview a disabled cut
+    /// as if it were applied).
+    func cutsAsSegments(including forcedOpId: String? = nil) -> [Segment] {
+        reviewCuts.compactMap { cut in
+            guard cut.enabled || cut.opId == forcedOpId else { return nil }
+            let (start, end) = sourceTimes(for: cut)
+            guard end > start else { return nil }
+            return Segment(start: start, end: end)
+        }
     }
 
     var removedCount: Int { decisions.filter { $0.action == .remove }.count }
@@ -487,7 +515,8 @@ final class AppState {
                 height: height
             )
 
-        case .silenceFound(let count, _):
+        case .silenceFound(let count, let segments):
+            silenceSegments = segments
             appendLog(.dim, "… \(count) silence region\(count == 1 ? "" : "s") found")
 
         case .transcript(let tokenCount, let preview):
@@ -600,6 +629,7 @@ final class AppState {
         awaitingReviewConfirmation = false
         transcript.removeAll()
         reviewCuts.removeAll()
+        silenceSegments.removeAll()
         manualCutCounter = 0
         decisions.removeAll()
         proposalDurations.removeAll()

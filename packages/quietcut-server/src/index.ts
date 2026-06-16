@@ -7,7 +7,13 @@ import {
   runSmartcut,
   type SmartcutConfig,
 } from "quietcut-core";
-import { extractClip, extractStitchedClip } from "./audio-preview.js";
+import {
+  extractClip,
+  extractEditedPreview,
+  extractStitchedClip,
+  type EditedPreviewOptions,
+} from "./audio-preview.js";
+import type { Segment } from "quietcut-core";
 import { getMetadata } from "./metadata.js";
 import {
   parseRpcLine,
@@ -127,6 +133,19 @@ type ExtractStitchedClipParams = {
   tailSec?: number;
 };
 
+type ExtractEditedPreviewParams = {
+  path: string;
+  duration: number;
+  focusStart: number;
+  focusEnd: number;
+  padSec?: number;
+  tailSec?: number;
+  leadInMs?: number;
+  tailOutMs?: number;
+  cuts?: Segment[];
+  silences?: Segment[];
+};
+
 const dispatcher = new RpcDispatcher();
 
 dispatcher.register("ping", async () => ({ pong: true }));
@@ -170,6 +189,36 @@ dispatcher.register("extractStitchedClip", async (params) => {
     padSec: p.padSec,
     tailSec: p.tailSec,
   });
+});
+
+dispatcher.register("extractEditedPreview", async (params) => {
+  const p = params as ExtractEditedPreviewParams | undefined;
+  if (
+    !p?.path ||
+    typeof p.duration !== "number" ||
+    typeof p.focusStart !== "number" ||
+    typeof p.focusEnd !== "number"
+  ) {
+    throw new RpcDispatchError(
+      RPC_ERROR.invalidParams,
+      "extractEditedPreview requires { path, duration, focusStart, focusEnd }",
+    );
+  }
+  const opts: EditedPreviewOptions = {
+    padSec: p.padSec,
+    tailSec: p.tailSec,
+    leadInMs: p.leadInMs,
+    tailOutMs: p.tailOutMs,
+    cuts: p.cuts,
+    silences: p.silences,
+  };
+  return await extractEditedPreview(
+    p.path,
+    p.duration,
+    p.focusStart,
+    p.focusEnd,
+    opts,
+  );
 });
 
 dispatcher.register("start", async (params) => {

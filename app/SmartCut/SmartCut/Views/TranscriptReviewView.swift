@@ -1,4 +1,5 @@
 import AppKit
+import AVFoundation
 import SwiftUI
 
 /// Batch transcript review: shows the entire transcript with every AI-suggested
@@ -10,6 +11,8 @@ struct TranscriptReviewView: View {
     @Environment(AppState.self) private var appState
     @Environment(\.colorScheme) private var colorScheme
 
+    /// Shared audio player — one instance means playing one chip stops any other.
+    @State private var audio = AudioPlayer()
     /// The cut currently being edited (its handles are shown + draggable).
     @State private var activeCutId: String?
     /// Anchor word of an in-progress manual selection: set by a plain click on a
@@ -143,6 +146,9 @@ struct TranscriptReviewView: View {
 
     private func cutChip(index: Int, cut: ReviewCutState) -> some View {
         let isActive = cut.opId == activeCutId
+        let previewKey = "preview-\(cut.opId)"
+        let isThisLoading = audio.currentKey == previewKey && audio.isLoading
+        let isThisPlaying = audio.currentKey == previewKey && audio.isPlaying
         return Button {
             activeCutId = cut.opId
             transcriptFocused = true
@@ -166,6 +172,8 @@ struct TranscriptReviewView: View {
                         .buttonStyle(.plain)
                         .help("Delete this cut")
                     }
+                    previewButton(cut: cut, key: previewKey,
+                                  isLoading: isThisLoading, isPlaying: isThisPlaying)
                     Toggle(
                         "",
                         isOn: Binding(
@@ -183,7 +191,7 @@ struct TranscriptReviewView: View {
                     .foregroundStyle(cut.enabled ? Theme.danger : Theme.muted)
             }
             .padding(10)
-            .frame(width: 170, alignment: .leading)
+            .frame(width: 184, alignment: .leading)
             .background(
                 RoundedRectangle(cornerRadius: Theme.radius, style: .continuous)
                     .fill(isActive ? Theme.wash : Theme.card)
@@ -194,6 +202,86 @@ struct TranscriptReviewView: View {
             )
         }
         .buttonStyle(.plain)
+    }
+
+    /// Small play / loading-spinner / stop button for a cut chip.
+    @ViewBuilder
+    private func previewButton(
+        cut: ReviewCutState,
+        key: String,
+        isLoading: Bool,
+        isPlaying: Bool
+    ) -> some View {
+        Button {
+            if isLoading || isPlaying {
+                audio.stop()
+            } else {
+                playPreview(for: cut, key: key)
+            }
+        } label: {
+            ZStack {
+                if isLoading {
+                    ProgressView()
+                        .progressViewStyle(.circular)
+                        .controlSize(.mini)
+                        .tint(Theme.indigo)
+                } else if isPlaying {
+                    Image(systemName: "stop.fill")
+                        .font(.system(size: 8, weight: .bold))
+                        .foregroundStyle(Theme.indigo)
+                } else {
+                    Image(systemName: "play.fill")
+                        .font(.system(size: 8, weight: .bold))
+                        .foregroundStyle(Theme.indigo)
+                }
+            }
+            .frame(width: 22, height: 22)
+            .background(
+                RoundedRectangle(cornerRadius: Theme.radiusSmall, style: .continuous)
+                    .fill(isPlaying ? Theme.indigo.opacity(0.15) : Theme.elevated)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: Theme.radiusSmall, style: .continuous)
+                            .stroke(isPlaying ? Theme.indigo : Theme.border, lineWidth: 1)
+                    )
+            )
+        }
+        .buttonStyle(.plain)
+        .help(isPlaying ? "Stop preview" : "Preview this cut (2.5s before + 2.5s after)")
+        .animation(.easeOut(duration: 0.12), value: isLoading)
+        .animation(.easeOut(duration: 0.12), value: isPlaying)
+    }
+
+    private func playPreview(for cut: ReviewCutState, key: String) {
+        guard let input = appState.droppedFile,
+              let duration = appState.metadata?.durationSec
+        else { return }
+
+        let (focusStart, focusEnd) = appState.sourceTimes(for: cut)
+        guard focusEnd > focusStart else { return }
+
+        // Include the previewed cut even if disabled so the user hears what
+        // the boundary would sound like with it applied.
+        let cuts = appState.cutsAsSegments(including: cut.opId)
+        let silences = appState.silenceSegments
+        let leadInMs = appState.options.leadInMs
+        let tailOutMs = appState.options.tailOutMs
+        let sidecar = appState.sidecar!
+
+        audio.play(key: key) {
+            let clip = try await sidecar.extractEditedPreview(
+                input: input,
+                duration: duration,
+                focusStart: focusStart,
+                focusEnd: focusEnd,
+                padSec: 2.5,
+                tailSec: 2.5,
+                leadInMs: leadInMs,
+                tailOutMs: tailOutMs,
+                cuts: cuts,
+                silences: silences
+            )
+            return URL(fileURLWithPath: clip.path)
+        }
     }
 
     /// Second line of a cut chip: a "Manual" tag for user-created cuts, or the
