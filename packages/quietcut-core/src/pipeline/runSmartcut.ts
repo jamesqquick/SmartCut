@@ -203,6 +203,7 @@ export async function* runSmartcut(
             tailOutMs: 0,
             skipApproval: true,
             dryRun: false,
+            encoder: config.encoder,
             crf: config.crf,
             preset: config.preset,
           },
@@ -243,6 +244,7 @@ export async function* runSmartcut(
             tailOutMs: 0,
             skipApproval: true,
             dryRun: false,
+            encoder: config.encoder,
             crf: config.crf,
             preset: config.preset,
           },
@@ -556,11 +558,23 @@ export async function* runSmartcut(
       tailOutMs: config.tailOutMs,
       skipApproval: true,
       dryRun: false,
+      encoder: config.encoder,
       crf: config.crf,
       preset: config.preset,
     },
     keep,
     {
+      onEncoder: (resolved) => {
+        progressQueue.push({
+          type: "progress",
+          stage: "render",
+          note:
+            resolved === "hardware"
+              ? "Encoding with VideoToolbox (hardware)"
+              : `Encoding with libx264 (${config.preset})`,
+        });
+        flushProgress();
+      },
       onProgress: (p) => {
         progressQueue.push({
           type: "renderProgress",

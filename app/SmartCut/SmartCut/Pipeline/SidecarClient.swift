@@ -31,8 +31,11 @@ struct StartOptions: Encodable, Sendable {
     var tailOutMs: Int = 300
     var skipApproval: Bool = false
     var dryRun: Bool = false
+    /// "auto" (hardware when available), "hardware" (VideoToolbox), or "software" (libx264).
+    var encoder: String = "auto"
     var crf: Int = 18
-    var preset: String = "medium"
+    /// libx264 preset; ignored when the hardware encoder is used.
+    var preset: String = "veryfast"
 }
 
 // MARK: - Errors

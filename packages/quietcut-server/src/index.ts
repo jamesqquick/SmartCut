@@ -1,4 +1,5 @@
 import * as readline from "node:readline";
+import type { Segment } from "quietcut-core";
 import {
   type PipelineEvent,
   type RetakeDecision,
@@ -8,12 +9,11 @@ import {
   type SmartcutConfig,
 } from "quietcut-core";
 import {
+  type EditedPreviewOptions,
   extractClip,
   extractEditedPreview,
   extractStitchedClip,
-  type EditedPreviewOptions,
 } from "./audio-preview.js";
-import type { Segment } from "quietcut-core";
 import { getMetadata } from "./metadata.js";
 import {
   parseRpcLine,
@@ -327,8 +327,9 @@ function buildConfig(
     tailOutMs: options.tailOutMs ?? 300,
     skipApproval: options.skipApproval ?? false,
     dryRun: options.dryRun ?? false,
+    encoder: options.encoder ?? "auto",
     crf: options.crf ?? 18,
-    preset: options.preset ?? "medium",
+    preset: options.preset ?? "veryfast",
   };
 }
 

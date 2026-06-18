@@ -12,6 +12,7 @@ import {
   runSmartcut,
   type SmartcutConfig,
   type Stage,
+  type VideoEncoder,
 } from "quietcut-core";
 import { formatDuration, printSmartcutPreview } from "./preview.js";
 import { printCut, promptRetakeDecision } from "./review.js";
@@ -35,6 +36,25 @@ const DEFAULT_FILLER_WORDS = new Set([
 ]);
 
 const DEFAULT_MODEL = "claude-opus-4-8";
+
+const VIDEO_ENCODERS: readonly VideoEncoder[] = [
+  "auto",
+  "hardware",
+  "software",
+];
+
+/** Validate the `--encoder` flag, exiting with a clear message if invalid. */
+function parseEncoder(value: string): VideoEncoder {
+  if ((VIDEO_ENCODERS as readonly string[]).includes(value)) {
+    return value as VideoEncoder;
+  }
+  console.error(
+    chalk.red(
+      `Error: invalid --encoder "${value}". Expected one of: ${VIDEO_ENCODERS.join(", ")}.`,
+    ),
+  );
+  process.exit(1);
+}
 
 // -----------------------------------------------------------------------------
 // Stage labels mirror the original ora messages so the CLI feels unchanged.
@@ -110,8 +130,13 @@ export const smartcutCommand = new Command("smartcut")
   )
   .option("-y, --yes", "Skip approval/review and render immediately")
   .option("--dry-run", "Print the plan and exit without rendering")
+  .option(
+    "--encoder <name>",
+    'Video encoder: "auto" (hardware when available), "hardware" (VideoToolbox), or "software" (libx264)',
+    "auto",
+  )
   .option("--crf <n>", "x264 CRF quality (lower = better)", "18")
-  .option("--preset <name>", "x264 preset", "medium")
+  .option("--preset <name>", "x264 preset (software encoder only)", "veryfast")
   .action(async (inputArg: string, opts) => {
     const input = resolve(inputArg);
 
@@ -143,6 +168,7 @@ export const smartcutCommand = new Command("smartcut")
       tailOutMs: parseInt(opts.tailOut, 10),
       skipApproval: Boolean(opts.yes),
       dryRun: Boolean(opts.dryRun),
+      encoder: parseEncoder(opts.encoder),
       crf: parseInt(opts.crf, 10),
       preset: opts.preset,
     };
