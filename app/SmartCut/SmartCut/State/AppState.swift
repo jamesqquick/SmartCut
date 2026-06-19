@@ -231,6 +231,11 @@ final class AppState {
 
     private(set) var sidecar: SidecarClient!
 
+    /// Process-wide handle to the live AppState so `AppDelegate` can tear the
+    /// sidecar down on termination. Weak: AppState's lifetime is owned by the
+    /// SwiftUI `App`, not this reference. There is only ever one instance.
+    static weak var shared: AppState?
+
     init() {
         let loadedConfig = AppConfig.load()
         let loadedPrefs = AppPreferences.load()
@@ -251,6 +256,8 @@ final class AppState {
                 Task { @MainActor in self?.handleSidecarExit(status: status) }
             }
         )
+
+        AppState.shared = self
     }
 
     /// Persist a new `AppConfig` and rebuild the sidecar so the new

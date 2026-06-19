@@ -274,15 +274,49 @@ final class SidecarClient {
     func stop() {
         guard let p = process, p.isRunning else { return }
         // Close stdin so the server exits cleanly via its readline 'close'
-        // path. Fall back to terminate if that doesn't take it down.
+        // path, then escalate: SIGTERM, then SIGKILL. The pid guard ensures a
+        // stale timer can't kill a sidecar we've since rebuilt.
+        let pid = p.processIdentifier
         try? stdinPipe?.fileHandleForWriting.close()
         DispatchQueue.global().asyncAfter(deadline: .now() + 2) { [weak self] in
             Task { @MainActor [weak self] in
-                if self?.process?.isRunning == true {
-                    self?.process?.terminate()
-                }
+                guard let p = self?.process, p.isRunning, p.processIdentifier == pid
+                else { return }
+                p.terminate()
             }
         }
+        DispatchQueue.global().asyncAfter(deadline: .now() + 4) { [weak self] in
+            Task { @MainActor [weak self] in
+                guard let p = self?.process, p.isRunning, p.processIdentifier == pid
+                else { return }
+                kill(pid, SIGKILL)
+            }
+        }
+    }
+
+    /// Synchronously bring the sidecar down. Used on app termination, where
+    /// async cleanup (DispatchQueue/Task) is not guaranteed to run before the
+    /// process exits. Sends SIGTERM, polls for a clean exit, then SIGKILL as a
+    /// hard fallback so a wedged or signal-deaf sidecar can never outlive the app.
+    func terminateNow() {
+        guard let p = process, p.isRunning else { return }
+        // Closing stdin lets a healthy server exit via its own readline 'close'.
+        try? stdinPipe?.fileHandleForWriting.close()
+        p.terminate()  // SIGTERM
+        // Poll up to ~3s. A healthy sidecar exits in milliseconds; the longer
+        // ceiling gives it time to cancel an in-flight render and reap its own
+        // ffmpeg/whisper child before we resort to SIGKILL (which would orphan
+        // that child). Iteration-bounded, not wall-clock, so a system clock
+        // change can't skew the deadline.
+        var waited = 0
+        while p.isRunning && waited < 150 {
+            usleep(20_000)  // 20ms * 150 = 3s
+            waited += 1
+        }
+        if p.isRunning {
+            kill(p.processIdentifier, SIGKILL)
+        }
+        process = nil
     }
 
     // MARK: Public RPC
