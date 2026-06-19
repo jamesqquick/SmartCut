@@ -106,6 +106,16 @@ type JobState = {
 
 let activeJob: JobState | null = null;
 
+/**
+ * The long-running ffmpeg render child of the active job, if any. Tracked so
+ * shutdown can kill it directly instead of waiting out the drain hard-cap and
+ * relying on execa's exit cleanup — which can't run if we're SIGKILLed.
+ * Structural (just `kill`) to avoid importing execa's types into the server.
+ */
+let activeChild: {
+  kill: (signal?: NodeJS.Signals | number) => boolean;
+} | null = null;
+
 class AsyncQueue<T> {
   private readonly items: T[] = [];
   private readonly waiters: Array<(value: T) => void> = [];
@@ -372,7 +382,11 @@ function startJob(config: SmartcutConfig, whisperModel: string): JobState {
   };
 
   state.finished = (async () => {
-    const gen = runSmartcut(config, whisperModel);
+    const gen = runSmartcut(config, whisperModel, {
+      onProcess: (proc) => {
+        activeChild = proc;
+      },
+    });
     let nextDecision: JobDecision | undefined;
 
     try {
@@ -399,6 +413,7 @@ function startJob(config: SmartcutConfig, whisperModel: string): JobState {
       sendEvent({ type: "error", message });
       logError(err);
     } finally {
+      activeChild = null;
       if (state === activeJob) activeJob = null;
     }
   })();
@@ -452,6 +467,11 @@ function gracefulShutdown(reason: string): void {
     activeJob.cancelRequested = true;
     activeJob.decisions.push({ kind: "cancel" });
   }
+  // Kill the in-flight ffmpeg render directly. `cancel` only lands at the
+  // generator's yield points, not mid-render, so without this the drain below
+  // would wait out the full hard-cap while ffmpeg keeps burning a core. Killing
+  // it makes render() reject, the job finish, and the drain resolve promptly.
+  activeChild?.kill("SIGKILL");
   const forceExit = setTimeout(() => process.exit(0), 2000);
   forceExit.unref();
   drainInFlight().finally(() => process.exit(0));
