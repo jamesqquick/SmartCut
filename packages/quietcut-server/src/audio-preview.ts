@@ -3,11 +3,7 @@ import { mkdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { execa } from "execa";
-import {
-  buildEditPlan,
-  planToKeepSegments,
-  type Segment,
-} from "quietcut-core";
+import { buildEditPlan, planToKeepSegments, type Segment } from "quietcut-core";
 
 const PREVIEW_DIR = join(tmpdir(), "smartcut-previews");
 const TTL_MS = 5 * 60 * 1000;
@@ -144,8 +140,22 @@ export async function extractEditedPreview(
   // Build a throwaway EditPlan from the client-supplied segments.
   // Manual cuts behave like retakes (hard join, no padding bleed).
   const operations = [
-    ...cuts.map((s) => ({ type: "removeRetake" as const, start: s.start, end: s.end, reason: "", removedText: "", keptText: "", contextBefore: "", contextAfter: "", confidence: 100 })),
-    ...silences.map((s) => ({ type: "removeSilence" as const, start: s.start, end: s.end })),
+    ...cuts.map((s) => ({
+      type: "removeRetake" as const,
+      start: s.start,
+      end: s.end,
+      reason: "",
+      removedText: "",
+      keptText: "",
+      contextBefore: "",
+      contextAfter: "",
+      confidence: 100,
+    })),
+    ...silences.map((s) => ({
+      type: "removeSilence" as const,
+      start: s.start,
+      end: s.end,
+    })),
   ];
   const plan = buildEditPlan(input, duration, operations);
   const keepAll = planToKeepSegments(plan, leadInMs, tailOutMs);
@@ -174,9 +184,7 @@ export async function extractEditedPreview(
       `[0:a]atrim=start=${seg.start}:end=${seg.end},asetpts=PTS-STARTPTS[a${i}]`,
   );
   const concatInputs = windowed.map((_, i) => `[a${i}]`).join("");
-  filterParts.push(
-    `${concatInputs}concat=n=${windowed.length}:v=0:a=1[aout]`,
-  );
+  filterParts.push(`${concatInputs}concat=n=${windowed.length}:v=0:a=1[aout]`);
   const filter = filterParts.join(";");
 
   const result = await execa(
