@@ -1,4 +1,5 @@
 import * as readline from "node:readline";
+import type { Segment } from "quietcut-core";
 import {
   type PipelineEvent,
   type RetakeDecision,
@@ -8,12 +9,11 @@ import {
   type SmartcutConfig,
 } from "quietcut-core";
 import {
+  type EditedPreviewOptions,
   extractClip,
   extractEditedPreview,
   extractStitchedClip,
-  type EditedPreviewOptions,
 } from "./audio-preview.js";
-import type { Segment } from "quietcut-core";
 import { getMetadata } from "./metadata.js";
 import {
   parseRpcLine,
