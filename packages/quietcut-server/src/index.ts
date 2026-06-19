@@ -471,6 +471,8 @@ function gracefulShutdown(reason: string): void {
   // generator's yield points, not mid-render, so without this the drain below
   // would wait out the full hard-cap while ffmpeg keeps burning a core. Killing
   // it makes render() reject, the job finish, and the drain resolve promptly.
+  // Other long stages (whisper/extract) aren't tracked here; they're bounded
+  // by the hard-cap below and reaped by execa's exit cleanup.
   activeChild?.kill("SIGKILL");
   const forceExit = setTimeout(() => process.exit(0), 2000);
   forceExit.unref();
@@ -482,10 +484,14 @@ function gracefulShutdown(reason: string): void {
  * reparenting). Draining would be pointless (every protocol write would just
  * EPIPE) and must not be gated behind `shuttingDown`, so that a parent death
  * detected *during* a graceful drain still exits right away rather than
- * waiting out the drain's hard-cap. `process.exit` also runs execa's
- * signal-exit cleanup, killing any in-flight ffmpeg/whisper child.
+ * waiting out the drain's hard-cap.
+ *
+ * `process.exit` also runs execa's signal-exit cleanup (SIGTERM) on any child,
+ * but we SIGKILL the tracked render directly first so its teardown doesn't
+ * depend on signal-exit timing while the parent is collapsing.
  */
 function exitNow(): never {
+  activeChild?.kill("SIGKILL");
   process.exit(0);
 }
 
