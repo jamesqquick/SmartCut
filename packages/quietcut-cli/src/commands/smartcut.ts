@@ -117,6 +117,15 @@ export const smartcutCommand = new Command("smartcut")
     "Load a saved EditPlan JSON and skip detection (re-render)",
   )
   .option("--save-plan <path>", "Write the EditPlan JSON after detection")
+  // transcript export (final edited timeline)
+  .option(
+    "--export-srt <path>",
+    "Write a YouTube SubRip (.srt) caption file aligned to the final cut",
+  )
+  .option(
+    "--export-ai-json <path>",
+    "Write a structured AI-editing transcript (.json) aligned to the final cut",
+  )
   // shared options
   .option(
     "-i, --lead-in <ms>",
@@ -164,6 +173,10 @@ export const smartcutCommand = new Command("smartcut")
         : undefined,
       planPath: opts.plan ? resolve(opts.plan) : undefined,
       savePlanPath: opts.savePlan ? resolve(opts.savePlan) : undefined,
+      exportSrtPath: opts.exportSrt ? resolve(opts.exportSrt) : undefined,
+      exportAiJsonPath: opts.exportAiJson
+        ? resolve(opts.exportAiJson)
+        : undefined,
       leadInMs: parseInt(opts.leadIn, 10),
       tailOutMs: parseInt(opts.tailOut, 10),
       skipApproval: Boolean(opts.yes),

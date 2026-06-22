@@ -78,22 +78,6 @@ struct CredentialFields: View {
         DisclosureGroup("Advanced — binary paths", isExpanded: $showsAdvancedPaths) {
             VStack(alignment: .leading, spacing: 10) {
                 pathField(
-                    "node",
-                    placeholder: "/opt/homebrew/bin/node",
-                    text: Binding(
-                        get: { config.nodePath ?? "" },
-                        set: { config.nodePath = $0 }
-                    )
-                )
-                pathField(
-                    "Sidecar bundle",
-                    placeholder: "/Users/you/code/SmartCut/packages/quietcut-server/dist/server.cjs",
-                    text: Binding(
-                        get: { config.sidecarPath ?? "" },
-                        set: { config.sidecarPath = $0 }
-                    )
-                )
-                pathField(
                     "ffmpeg directory",
                     placeholder: "/opt/homebrew/bin",
                     text: Binding(

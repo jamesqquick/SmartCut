@@ -104,6 +104,10 @@ export type SmartcutConfig = {
   saveTranscriptPath?: string;
   planPath?: string; // load a saved EditPlan and skip detection
   savePlanPath?: string; // write the EditPlan JSON after detection
+  // Transcript export (final edited timeline). Written after the plan is
+  // finalized. Skipped when no transcript is available (e.g. --plan re-render).
+  exportSrtPath?: string; // write a YouTube SubRip (.srt) caption file
+  exportAiJsonPath?: string; // write a structured AI-editing transcript (.json)
   // When true, surface all retakes at once with the full transcript via a
   // single `reviewReady` event and await a batch `RetakeReviewResult` (the
   // SwiftUI app's transcript-editing flow). When false/undefined, fall back to

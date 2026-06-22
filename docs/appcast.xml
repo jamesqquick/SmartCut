@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0"
+     xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle"
+     xmlns:dc="http://purl.org/dc/elements/1.1/">
+  <channel>
+    <title>SmartCut</title>
+    <link>https://github.com/jamesqquick/SmartCut/releases</link>
+    <description>SmartCut release history.</description>
+    <language>en</language>
+
+        <item>
+      <title>SmartCut 0.2.0</title>
+      <pubDate>Mon, 22 Jun 2026 20:26:16 +0000</pubDate>
+      <sparkle:version>2</sparkle:version>
+      <sparkle:shortVersionString>0.2.0</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      <sparkle:releaseNotesLink>https://github.com/jamesqquick/SmartCut/releases/tag/v0.2.0</sparkle:releaseNotesLink>
+      <enclosure
+        url="https://github.com/jamesqquick/SmartCut/releases/download/v0.2.0/SmartCut-update.zip"
+        sparkle:edSignature="o0wBPKBevpBB+p8NThxiVptodPkdGG3s2lQaaxpzGyr+puh6xySakchgk21w+YMBgBHmO/YtyzIpjH0Egd9BBg=="
+        length="2556480"
+        type="application/zip" />
+    </item>
+
+        <item>
+      <title>SmartCut 0.2.1</title>
+      <pubDate>Mon, 22 Jun 2026 21:05:54 +0000</pubDate>
+      <sparkle:version>3</sparkle:version>
+      <sparkle:shortVersionString>0.2.1</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      <sparkle:releaseNotesLink>https://github.com/jamesqquick/SmartCut/releases/tag/v0.2.1</sparkle:releaseNotesLink>
+      <enclosure
+        url="https://github.com/jamesqquick/SmartCut/releases/download/v0.2.1/SmartCut-update.zip"
+        sparkle:edSignature="enGw1iVmnnGZI8m3yCW1rHNfXE7Szlwb5tN7moZzsBPgWJ2N1yb0RkEoylkrQMmg4mNp+1QDWOJSW9hPJ2avAw=="
+        length="2557272"
+        type="application/zip" />
+    </item>
+
+    <!-- RELEASES PREPENDED BY CI ABOVE THIS LINE -->
+
+  </channel>
+</rss>

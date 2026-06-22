@@ -152,6 +152,68 @@ jobs:
       - name: Staple DMG
         run: xcrun stapler staple "$RUNNER_TEMP/SmartCut.dmg"
 
+      # --- Sparkle update artifact ---
+
+      - name: Install Sparkle tools
+        # Fetch the latest Sparkle release dynamically so CI stays current
+        # without manual version bumps.  Adds bin/ (sign_update, generate_appcast)
+        # to PATH for the signing step below.
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          SPARKLE_VER=$(curl -sS -H "Authorization: Bearer $GH_TOKEN" \
+            https://api.github.com/repos/sparkle-project/Sparkle/releases/latest \
+            | python3 -c "import sys,json; print(json.load(sys.stdin)['tag_name'])")
+          curl -fsSL \
+            "https://github.com/sparkle-project/Sparkle/releases/download/${SPARKLE_VER}/Sparkle-${SPARKLE_VER}.tar.xz" \
+            -o /tmp/sparkle.tar.xz
+          mkdir -p /tmp/sparkle-tools
+          tar -xf /tmp/sparkle.tar.xz -C /tmp/sparkle-tools
+          echo "/tmp/sparkle-tools/bin" >> "$GITHUB_PATH"
+
+      - name: Create Sparkle update zip (post-staple)
+        # The SmartCut.app.zip created earlier (for notarytool) was built
+        # BEFORE xcrun stapler staple, so it lacks the staple ticket.
+        # Re-zip the stapled .app so Gatekeeper accepts the update.
+        run: |
+          ditto -c -k --keepParent \
+            "$RUNNER_TEMP/export/SmartCut.app" \
+            "$RUNNER_TEMP/SmartCut-update.zip"
+
+      - name: Sign update zip with EdDSA key
+        env:
+          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+        run: |
+          # Sparkle 2.x: write the base64 key to a temp file and pass via
+          # --ed-key-file. The -s flag is deprecated and exits 1 in recent builds.
+          printf '%s' "$SPARKLE_PRIVATE_KEY" > /tmp/sparkle_key
+          SIGN_OUT=$(sign_update --ed-key-file /tmp/sparkle_key "$RUNNER_TEMP/SmartCut-update.zip")
+          rm -f /tmp/sparkle_key
+          ED_SIG=$(echo "$SIGN_OUT" | grep -oE 'edSignature="[^"]+"' | cut -d'"' -f2)
+          FILE_SIZE=$(wc -c < "$RUNNER_TEMP/SmartCut-update.zip" | tr -d ' ')
+          echo "ED_SIG=$ED_SIG"       >> "$GITHUB_ENV"
+          echo "FILE_SIZE=$FILE_SIZE" >> "$GITHUB_ENV"
+
+      - name: Update appcast.xml
+        run: |
+          BUILD=$(python3 -c "import plistlib; \
+            p = plistlib.load(open('app/SmartCut/SmartCut/Info.plist', 'rb')); \
+            print(p['CFBundleVersion'])")
+          python3 scripts/update-appcast.py \
+            --version   "${{ steps.version.outputs.VERSION }}" \
+            --build     "$BUILD" \
+            --signature "$ED_SIG" \
+            --length    "$FILE_SIZE" \
+            --appcast   docs/appcast.xml
+
+      - name: Commit updated appcast
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add docs/appcast.xml
+          git commit -m "chore: update appcast for v${{ steps.version.outputs.VERSION }}"
+          git push origin HEAD:main
+
       # --- Publish ---
 
       - name: Create GitHub Release
@@ -161,4 +223,6 @@ jobs:
           draft: false
           prerelease: ${{ contains(github.ref_name, '-') }}
           generate_release_notes: true
-          files: ${{ runner.temp }}/SmartCut.dmg
+          files: |
+            ${{ runner.temp }}/SmartCut.dmg
+            ${{ runner.temp }}/SmartCut-update.zip

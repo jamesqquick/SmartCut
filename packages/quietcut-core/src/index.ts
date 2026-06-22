@@ -32,6 +32,7 @@ export {
   transcribeFromAudio,
 } from "./retake/transcribe.js";
 export * from "./segments.js";
+export * from "./transcript-export/index.js";
 export * from "./types.js";
 export {
   assertFfmpegAvailable,

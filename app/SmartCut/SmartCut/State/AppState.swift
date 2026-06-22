@@ -28,6 +28,13 @@ enum CutSource: Sendable {
     case manual
 }
 
+/// Per-cut review decision.
+enum ReviewStatus: Sendable {
+    case pending
+    case approved
+    case rejected
+}
+
 /// Mutable per-cut state for the batch transcript-review screen. AI cuts start
 /// from a Claude proposal; manual cuts are created by the user from a text
 /// selection. Either can be toggled off or have its word boundaries moved.
@@ -36,7 +43,8 @@ struct ReviewCutState: Identifiable, Sendable {
     /// The originating AI proposal, or `nil` for a manual cut.
     let op: RemoveRetakeOp?
     let source: CutSource
-    var enabled: Bool
+    /// User decision for this cut.
+    var status: ReviewStatus = .pending
     var removeStartIndex: Int  // inclusive transcript token index (current, may be dragged)
     var removeEndIndex: Int    // inclusive transcript token index (current, may be dragged)
     /// The proposal's original word indices, frozen at `reviewReady`. Used to
@@ -47,6 +55,11 @@ struct ReviewCutState: Identifiable, Sendable {
     let originalStartIndex: Int
     let originalEndIndex: Int
     var id: String { opId }
+    /// Whether this cut will be applied at render time.
+    var enabled: Bool {
+        get { status == .approved }
+        set { status = newValue ? .approved : .rejected }
+    }
 }
 
 struct RenderStats: Sendable {
@@ -135,6 +148,36 @@ final class AppState {
     /// RPC so the faithful preview can apply silence cuts within the window.
     var silenceSegments: [Segment] = []
 
+    /// Index of the cut currently shown in the review card.
+    var currentCutIndex: Int = 0
+
+    // MARK: - Review progress helpers
+
+    var reviewedCount: Int {
+        reviewCuts.filter { $0.status != .pending }.count
+    }
+
+    /// True when every cut has been approved or rejected — gates Render.
+    var allReviewed: Bool {
+        !reviewCuts.isEmpty && reviewCuts.allSatisfy { $0.status != .pending }
+    }
+
+    /// The index of the next pending cut after `index`. Returns `nil` if all reviewed.
+    func nextPendingIndex(after index: Int) -> Int? {
+        guard !reviewCuts.isEmpty else { return nil }
+        if let i = reviewCuts[(index + 1)...].indices.first(where: {
+            reviewCuts[$0].status == .pending
+        }) { return i }
+        if let i = reviewCuts[...index].indices.first(where: {
+            reviewCuts[$0].status == .pending
+        }) { return i }
+        return nil
+    }
+
+    /// Cache of prefetched video preview clips keyed by `opId`.
+    var videoPreviews: [String: VideoClip] = [:]
+    private var prefetchTask: Task<Void, Never>?
+
     var enabledCutCount: Int { reviewCuts.filter(\.enabled).count }
 
     /// Estimated total time removed by the currently-enabled cuts.
@@ -153,9 +196,8 @@ final class AppState {
         return max(0, end - start)
     }
 
-    /// Source-time span for a cut derived from its current word boundaries.
-    /// Use this (not `op.start`/`op.end`) so dragged boundaries and manual
-    /// cuts (which have no `op`) are always correct.
+    /// Source-time span derived from the current word boundaries.
+    /// Used to compute boundaries for dragged or manual cuts (which have no silence-snapped op).
     func sourceTimes(for cut: ReviewCutState) -> (start: Double, end: Double) {
         guard !transcript.isEmpty else { return (0, 0) }
         let s = max(0, min(cut.removeStartIndex, transcript.count - 1))
@@ -163,6 +205,23 @@ final class AppState {
         let start = transcript[s].start
         let end = e + 1 < transcript.count ? transcript[e + 1].start : transcript[e].end
         return (start, end)
+    }
+
+    /// The exact time range that will be removed for this cut in the final render.
+    ///
+    /// Mirrors `cutsAsSegments()` logic so the audio preview window is centred on
+    /// exactly the audio that will be cut — not on whisper word-onset times, which
+    /// can differ from the silence-snapped boundaries used for unchanged AI cuts.
+    ///
+    /// - Unchanged AI cut → `op.start`/`op.end` (silence-snapped, same as renderer)
+    /// - Dragged AI cut or manual cut → word-onset times from transcript indices
+    func renderTimes(for cut: ReviewCutState) -> (start: Double, end: Double) {
+        let boundariesUnchanged = cut.removeStartIndex == cut.originalStartIndex
+            && cut.removeEndIndex == cut.originalEndIndex
+        if let op = cut.op, boundariesUnchanged {
+            return (op.start, op.end)
+        }
+        return sourceTimes(for: cut)
     }
 
     /// All enabled cuts mapped to source-time segments, suitable for passing to
@@ -197,6 +256,71 @@ final class AppState {
     }
 
     var removedCount: Int { decisions.filter { $0.action == .remove }.count }
+
+    // MARK: - Video prefetch
+
+    func prefetchVideoPreview(forCutAt index: Int) {
+        guard
+            index >= 0, index < reviewCuts.count,
+            let file = droppedFile,
+            let duration = metadata?.durationSec
+        else { return }
+        let cut = reviewCuts[index]
+        if videoPreviews[cut.opId] != nil { return }
+        prefetchTask?.cancel()
+        // renderTimes (not sourceTimes): match the renderer's snapped boundaries
+        // so the prefetched clip is centred on the same window the on-demand
+        // render and the audio preview use.
+        let times = renderTimes(for: cut)
+        guard times.end > times.start else { return }
+        let cuts = cutsAsSegments(including: cut.opId)
+        let silences = silenceSegments
+        prefetchTask = Task { [weak self] in
+            guard let self else { return }
+            do {
+                let clip = try await self.engine.extractEditedVideoPreview(
+                    input: file,
+                    duration: duration,
+                    focusStart: times.start,
+                    focusEnd: times.end,
+                    cuts: cuts,
+                    silences: silences
+                )
+                try Task.checkCancellation()
+                await MainActor.run { self.videoPreviews[cut.opId] = clip }
+            } catch {
+                // Silent — UI falls back to on-demand render
+            }
+        }
+    }
+
+    // MARK: - Review navigation & decisions
+
+    func navigateTo(_ index: Int) {
+        guard reviewCuts.indices.contains(index) else { return }
+        currentCutIndex = index
+        let next = index + 1 < reviewCuts.count ? index + 1 : 0
+        prefetchVideoPreview(forCutAt: next)
+    }
+
+    func approveCurrent() {
+        guard reviewCuts.indices.contains(currentCutIndex) else { return }
+        reviewCuts[currentCutIndex].status = .approved
+        advanceAfterDecision()
+    }
+
+    func rejectCurrent() {
+        guard reviewCuts.indices.contains(currentCutIndex) else { return }
+        reviewCuts[currentCutIndex].status = .rejected
+        advanceAfterDecision()
+    }
+
+    private func advanceAfterDecision() {
+        if let next = nextPendingIndex(after: currentCutIndex) {
+            navigateTo(next)
+        }
+    }
+
     var keptCount: Int { decisions.filter { $0.action == .keep }.count }
     var savedSoFar: Double {
         decisions
@@ -229,7 +353,12 @@ final class AppState {
 
     // --- dependencies ---
 
-    private(set) var sidecar: SidecarClient!
+    private(set) var engine: PipelineEngine!
+
+    /// Process-wide handle to the live AppState so `AppDelegate` can tear the
+    /// engine down on termination. Weak: AppState's lifetime is owned by the
+    /// SwiftUI `App`, not this reference. There is only ever one instance.
+    static weak var shared: AppState?
 
     init() {
         let loadedConfig = AppConfig.load()
@@ -239,28 +368,27 @@ final class AppState {
         self.needsFirstRunConfig = !loadedConfig.hasRequiredSecrets
         self.options = loadedPrefs.makeStartOptions()
 
-        // SidecarClient needs a reference back to us for event dispatch.
+        // PipelineEngine needs a reference back to us for event dispatch.
         // Capture-then-bind dance to avoid passing `self` before `self`
         // is fully initialized.
-        self.sidecar = SidecarClient(
-            config: .from(loadedConfig),
+        self.engine = PipelineEngine(
+            config: loadedConfig,
             onEvent: { [weak self] event in
                 Task { @MainActor in self?.handle(event: event) }
-            },
-            onExit: { [weak self] status in
-                Task { @MainActor in self?.handleSidecarExit(status: status) }
             }
         )
+
+        AppState.shared = self
     }
 
-    /// Persist a new `AppConfig` and rebuild the sidecar so the new
-    /// node path / env reach the next spawn.
+    /// Persist a new `AppConfig` and rebuild the engine so the new credentials
+    /// take effect on the next job.
     func saveConfig(_ newConfig: AppConfig) {
         do {
             try newConfig.save()
             config = newConfig
             needsFirstRunConfig = !newConfig.hasRequiredSecrets
-            rebuildSidecar()
+            rebuildEngine()
         } catch {
             errorMessage = "Could not save config: \(error.localizedDescription)"
         }
@@ -276,31 +404,26 @@ final class AppState {
         }
     }
 
-    /// Tear down and recreate the SidecarClient. Called by the error
-    /// banner's "Restart sidecar" button.
+    /// Cancel any active run and reset the engine. Called by the error
+    /// banner's "Restart sidecar" button (label preserved for UI compat).
     func restartSidecar() {
-        rebuildSidecar()
+        rebuildEngine()
         errorMessage = nil
-        appendLog(.info, "Sidecar restarted")
+        appendLog(.info, "Engine restarted")
     }
 
     /// Dismiss the current error banner and return to the drop screen.
-    /// Rebuilds the sidecar silently so a crashed process is recovered
-    /// without exposing implementation details to the user.
     func dismissError() {
-        rebuildSidecar()
+        rebuildEngine()
         resetToDrop()
     }
 
-    private func rebuildSidecar() {
-        sidecar.stop()
-        sidecar = SidecarClient(
-            config: .from(config),
+    private func rebuildEngine() {
+        engine.stop()
+        engine = PipelineEngine(
+            config: config,
             onEvent: { [weak self] event in
                 Task { @MainActor in self?.handle(event: event) }
-            },
-            onExit: { [weak self] status in
-                Task { @MainActor in self?.handleSidecarExit(status: status) }
             }
         )
     }
@@ -317,7 +440,7 @@ final class AppState {
         options.output = defaultOutputPath(for: url)
 
         do {
-            let md = try await sidecar.getMetadata(path: url)
+            let md = try await engine.getMetadata(path: url)
             metadata = md
             // Stay on .drop; DropZoneView switches to its "ready to cut"
             // state when metadata is non-nil.
@@ -349,7 +472,7 @@ final class AppState {
         currentStage = nil
 
         do {
-            _ = try await sidecar.start(input: input, options: options)
+            _ = try await engine.start(input: input, options: options)
         } catch {
             errorMessage = error.localizedDescription
             appendLog(.err, error.localizedDescription)
@@ -381,7 +504,7 @@ final class AppState {
         appendLog(.info, "\(label) cut \(current.index + 1)/\(current.total)")
 
         do {
-            try await sidecar.decide(opId: current.id, action: action)
+            try await engine.decide(opId: current.id, action: action)
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -392,7 +515,11 @@ final class AppState {
         awaitingReviewConfirmation = false
         appendLog(.info, "No retakes — proceeding to render")
         do {
-            try await sidecar.decide(opId: "review-confirm", action: .approveRest)
+            // Submit an empty review to unblock the pipeline's CheckedContinuation.
+            // engine.decide() is a no-op in batch mode — only submitReview resumes the
+            // continuation. Submitting empty cuts means no retakes are applied; only
+            // the automatic silence cuts will be rendered.
+            try await engine.submitReview(cuts: [])
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -445,7 +572,7 @@ final class AppState {
                 opId: opId,
                 op: nil,
                 source: .manual,
-                enabled: true,
+                status: .pending,
                 removeStartIndex: lo,
                 removeEndIndex: hi,
                 originalStartIndex: lo,
@@ -469,6 +596,7 @@ final class AppState {
         guard let i = reviewCuts.firstIndex(where: { $0.opId == opId }) else { return }
         let lower = i > 0 ? reviewCuts[i - 1].removeEndIndex + 1 : 0
         reviewCuts[i].removeStartIndex = max(lower, min(index, reviewCuts[i].removeEndIndex))
+        videoPreviews.removeValue(forKey: opId)
     }
 
     /// Move a cut's end boundary to `index`, clamped so it can't cross the
@@ -480,6 +608,7 @@ final class AppState {
             ? reviewCuts[i + 1].removeStartIndex - 1
             : transcript.count - 1
         reviewCuts[i].removeEndIndex = min(upper, max(index, reviewCuts[i].removeStartIndex))
+        videoPreviews.removeValue(forKey: opId)
     }
 
     /// Submit the (possibly adjusted) cuts and proceed to render.
@@ -495,17 +624,33 @@ final class AppState {
         awaitingReviewConfirmation = false
         appendLog(.info, "Applying \(enabledCutCount) of \(reviewCuts.count) cut(s)")
         do {
-            try await sidecar.submitReview(cuts: cuts)
+            try await engine.submitReview(cuts: cuts)
         } catch {
             errorMessage = error.localizedDescription
         }
     }
 
     func cancel() async {
-        do { try await sidecar.cancel() } catch {
+        do { try await engine.cancel() } catch {
             errorMessage = error.localizedDescription
         }
         resetToDrop()
+    }
+
+    /// True once a finished run has a transcript available to export.
+    var canExportTranscript: Bool { engine?.canExportTranscript == true }
+
+    /// Re-transcribe the final rendered video and write the transcript to `url`.
+    /// Returns the written URL on success; sets `errorMessage` and returns nil on failure.
+    func exportTranscript(format: TranscriptExportFormat, to url: URL) async -> URL? {
+        do {
+            try await engine.exportTranscript(format: format, to: url)
+            appendLog(.ok, "Transcript (\(format.rawValue)) exported → \(url.path)")
+            return url
+        } catch {
+            errorMessage = error.localizedDescription
+            return nil
+        }
     }
 
     func resetToDrop() {
@@ -585,7 +730,7 @@ final class AppState {
                     opId: $0.opId,
                     op: $0.op,
                     source: .ai,
-                    enabled: true,
+                    status: .pending,
                     removeStartIndex: $0.removeStartIndex,
                     removeEndIndex: $0.removeEndIndex,
                     originalStartIndex: $0.removeStartIndex,
@@ -616,7 +761,6 @@ final class AppState {
 
         case .done(let plan, let output, let savedSec, let savedPercent, let elapsedSec):
             let outURL = URL(fileURLWithPath: output)
-            let retakesProposed = decisions.count
             // "Kept" = proposals the user disabled (batch flow) or chose to keep
             // (legacy per-cut flow).
             let retakesKept =
@@ -633,7 +777,6 @@ final class AppState {
                 retakesKept: retakesKept,
                 elapsedSec: elapsedSec
             )
-            _ = retakesProposed
             screen = .done
             appendLog(
                 .ok,
@@ -649,16 +792,11 @@ final class AppState {
         }
     }
 
+    // Engine does not exit; this method is kept for source compatibility only.
     private func handleSidecarExit(status: Int32) {
         guard status != 0 && summary == nil else { return }
-        let tail = sidecar.stderrSnapshot
-        let lastLine = tail
-            .split(separator: "\n")
-            .last(where: { !$0.trimmingCharacters(in: .whitespaces).isEmpty })
-            .map(String.init) ?? ""
-        let detail = lastLine.isEmpty ? "" : " — \(lastLine)"
-        errorMessage = "Sidecar exited unexpectedly (status \(status))\(detail)"
-        appendLog(.err, errorMessage ?? "Sidecar exited")
+        errorMessage = "Pipeline exited unexpectedly (status \(status))"
+        appendLog(.err, errorMessage ?? "Pipeline exited")
     }
 
     // MARK: - Convenience for the error banner
@@ -669,8 +807,8 @@ final class AppState {
         Array(activityLog.suffix(limit).reversed())
     }
 
-    /// Snapshot of the sidecar's stderr tail for the banner.
-    var sidecarStderrSnapshot: String { sidecar?.stderrSnapshot ?? "" }
+    /// Recent process stderr from the pipeline engine — shown in the error banner.
+    var sidecarStderrSnapshot: String { engine?.stderrSnapshot ?? "" }
 
     // MARK: - Helpers
 
@@ -685,6 +823,10 @@ final class AppState {
         transcript.removeAll()
         reviewCuts.removeAll()
         silenceSegments.removeAll()
+        currentCutIndex = 0
+        prefetchTask?.cancel()
+        prefetchTask = nil
+        videoPreviews.removeAll()
         manualCutCounter = 0
         decisions.removeAll()
         proposalDurations.removeAll()
