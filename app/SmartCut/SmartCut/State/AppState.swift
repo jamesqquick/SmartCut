@@ -153,9 +153,8 @@ final class AppState {
         return max(0, end - start)
     }
 
-    /// Source-time span for a cut derived from its current word boundaries.
-    /// Use this (not `op.start`/`op.end`) so dragged boundaries and manual
-    /// cuts (which have no `op`) are always correct.
+    /// Source-time span derived from the current word boundaries.
+    /// Used to compute boundaries for dragged or manual cuts (which have no silence-snapped op).
     func sourceTimes(for cut: ReviewCutState) -> (start: Double, end: Double) {
         guard !transcript.isEmpty else { return (0, 0) }
         let s = max(0, min(cut.removeStartIndex, transcript.count - 1))
@@ -163,6 +162,23 @@ final class AppState {
         let start = transcript[s].start
         let end = e + 1 < transcript.count ? transcript[e + 1].start : transcript[e].end
         return (start, end)
+    }
+
+    /// The exact time range that will be removed for this cut in the final render.
+    ///
+    /// Mirrors `cutsAsSegments()` logic so the audio preview window is centred on
+    /// exactly the audio that will be cut — not on whisper word-onset times, which
+    /// can differ from the silence-snapped boundaries used for unchanged AI cuts.
+    ///
+    /// - Unchanged AI cut → `op.start`/`op.end` (silence-snapped, same as renderer)
+    /// - Dragged AI cut or manual cut → word-onset times from transcript indices
+    func renderTimes(for cut: ReviewCutState) -> (start: Double, end: Double) {
+        let boundariesUnchanged = cut.removeStartIndex == cut.originalStartIndex
+            && cut.removeEndIndex == cut.originalEndIndex
+        if let op = cut.op, boundariesUnchanged {
+            return (op.start, op.end)
+        }
+        return sourceTimes(for: cut)
     }
 
     /// All enabled cuts mapped to source-time segments, suitable for passing to
@@ -391,7 +407,11 @@ final class AppState {
         awaitingReviewConfirmation = false
         appendLog(.info, "No retakes — proceeding to render")
         do {
-            try await engine.decide(opId: "review-confirm", action: .approveRest)
+            // Submit an empty review to unblock the pipeline's CheckedContinuation.
+            // engine.decide() is a no-op in batch mode — only submitReview resumes the
+            // continuation. Submitting empty cuts means no retakes are applied; only
+            // the automatic silence cuts will be rendered.
+            try await engine.submitReview(cuts: [])
         } catch {
             errorMessage = error.localizedDescription
         }

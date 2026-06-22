@@ -47,6 +47,6 @@
 	<key>SUFeedURL</key>
 	<string>https://raw.githubusercontent.com/jamesqquick/SmartCut/main/docs/appcast.xml</string>
 	<key>SUPublicEDKey</key>
-	<string>REPLACE_WITH_PUBLIC_KEY_FROM_generate_keys</string>
+	<string>PkWoESqIh2Qu4y0cyLiQ4nHeJBeFRdBEfdib64AhRWw=</string>
 </dict>
 </plist>
