@@ -1,19 +1,23 @@
 import * as readline from "node:readline";
+import type { Segment } from "quietcut-core";
 import {
+  type EditPlan,
   type PipelineEvent,
   type RetakeDecision,
   type RetakeReviewResult,
   type ReviewCutDecision,
   runSmartcut,
   type SmartcutConfig,
+  type TranscriptExportFormat,
+  type TranscriptToken,
+  writeTranscriptExport,
 } from "quietcut-core";
 import {
+  type EditedPreviewOptions,
   extractClip,
   extractEditedPreview,
   extractStitchedClip,
-  type EditedPreviewOptions,
 } from "./audio-preview.js";
-import type { Segment } from "quietcut-core";
 import { getMetadata } from "./metadata.js";
 import {
   parseRpcLine,
@@ -78,6 +82,20 @@ type JobState = {
 };
 
 let activeJob: JobState | null = null;
+
+/**
+ * Snapshot of the most recently completed run, used to export its transcript
+ * on demand (the Done screen). Captured from the `reviewReady` (transcript) and
+ * `done` (final plan) events as a job streams. Cleared when a new job starts so
+ * a stale transcript from a previous file can't be exported mid-run.
+ */
+type LastRun = {
+  transcript: TranscriptToken[];
+  plan: EditPlan;
+  leadInMs: number;
+  tailOutMs: number;
+};
+let lastRun: LastRun | null = null;
 
 class AsyncQueue<T> {
   private readonly items: T[] = [];
@@ -144,6 +162,11 @@ type ExtractEditedPreviewParams = {
   tailOutMs?: number;
   cuts?: Segment[];
   silences?: Segment[];
+};
+
+type ExportTranscriptParams = {
+  format: TranscriptExportFormat;
+  outputPath: string;
 };
 
 const dispatcher = new RpcDispatcher();
@@ -219,6 +242,31 @@ dispatcher.register("extractEditedPreview", async (params) => {
     p.focusEnd,
     opts,
   );
+});
+
+dispatcher.register("exportTranscript", async (params) => {
+  const p = params as ExportTranscriptParams | undefined;
+  if (!p?.outputPath || (p.format !== "srt" && p.format !== "ai-json")) {
+    throw new RpcDispatchError(
+      RPC_ERROR.invalidParams,
+      "exportTranscript requires { format: 'srt' | 'ai-json', outputPath }",
+    );
+  }
+  if (!lastRun || lastRun.transcript.length === 0) {
+    throw new RpcDispatchError(
+      RPC_ERROR.invalidParams,
+      "No transcript available to export. Finish a cut first.",
+    );
+  }
+  const edited = await writeTranscriptExport(
+    p.outputPath,
+    p.format,
+    lastRun.transcript,
+    lastRun.plan,
+    lastRun.leadInMs,
+    lastRun.tailOutMs,
+  );
+  return { ok: true, path: p.outputPath, wordCount: edited.words.length };
 });
 
 dispatcher.register("start", async (params) => {
@@ -344,9 +392,14 @@ function startJob(config: SmartcutConfig, whisperModel: string): JobState {
     finished: Promise.resolve(),
   };
 
+  // A new run invalidates any previously exportable transcript.
+  lastRun = null;
+
   state.finished = (async () => {
     const gen = runSmartcut(config, whisperModel);
     let nextDecision: JobDecision | undefined;
+    // Captured as events stream; finalized into `lastRun` on `done`.
+    let runTranscript: TranscriptToken[] = [];
 
     try {
       while (true) {
@@ -355,6 +408,18 @@ function startJob(config: SmartcutConfig, whisperModel: string): JobState {
         if (done) break;
 
         sendEvent(value);
+
+        // Snapshot the transcript + final plan so the Done screen can export.
+        if (value.type === "reviewReady" && value.transcript.length > 0) {
+          runTranscript = value.transcript;
+        } else if (value.type === "done") {
+          lastRun = {
+            transcript: runTranscript,
+            plan: value.plan,
+            leadInMs: config.leadInMs,
+            tailOutMs: config.tailOutMs,
+          };
+        }
 
         // If the generator is waiting on a decision, block until the client
         // sends one. `retakeProposed` awaits a per-cut `decide`; `reviewReady`

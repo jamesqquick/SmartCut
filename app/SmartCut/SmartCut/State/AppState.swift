@@ -508,6 +508,24 @@ final class AppState {
         resetToDrop()
     }
 
+    /// True once a finished run has a transcript available to export.
+    var canExportTranscript: Bool { !transcript.isEmpty }
+
+    /// Export the finished run's transcript (final edited timeline) to `url`.
+    /// Returns the written URL on success; sets `errorMessage` and returns nil
+    /// on failure.
+    func exportTranscript(format: TranscriptExportFormat, to url: URL) async -> URL? {
+        do {
+            let result = try await sidecar.exportTranscript(
+                format: format, outputPath: url.path)
+            appendLog(.ok, "Transcript exported (\(result.wordCount) words) → \(result.path)")
+            return URL(fileURLWithPath: result.path)
+        } catch {
+            errorMessage = error.localizedDescription
+            return nil
+        }
+    }
+
     func resetToDrop() {
         screen = .drop
         droppedFile = nil

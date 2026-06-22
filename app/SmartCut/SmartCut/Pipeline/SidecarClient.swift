@@ -15,6 +15,21 @@ struct AudioClip: Decodable, Sendable {
     let durationSec: Double
 }
 
+/// Transcript export formats, both aligned to the final edited timeline.
+/// Raw values match the sidecar's `exportTranscript` wire contract.
+enum TranscriptExportFormat: String, Sendable {
+    case aiJson = "ai-json"  // structured segments + words for AI editing
+    case srt                 // YouTube SubRip caption track
+
+    var fileExtension: String { self == .aiJson ? "json" : "srt" }
+}
+
+struct TranscriptExportResult: Decodable, Sendable {
+    let ok: Bool
+    let path: String
+    let wordCount: Int
+}
+
 struct StartOptions: Encodable, Sendable {
     var output: String
     var thresholdDb: Double = -30
@@ -421,6 +436,22 @@ final class SidecarClient {
             let wasRunning: Bool
         }
         let _: R = try await request(method: "cancel", params: EmptyParams())
+    }
+
+    /// Export the most recently finished run's transcript (final edited
+    /// timeline) to `outputPath` in the requested format.
+    @discardableResult
+    func exportTranscript(
+        format: TranscriptExportFormat,
+        outputPath: String
+    ) async throws -> TranscriptExportResult {
+        struct P: Encodable {
+            let format: String
+            let outputPath: String
+        }
+        return try await request(
+            method: "exportTranscript",
+            params: P(format: format.rawValue, outputPath: outputPath))
     }
 
     // MARK: - Plumbing
