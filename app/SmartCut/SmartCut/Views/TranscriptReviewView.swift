@@ -135,6 +135,178 @@ struct TranscriptReviewView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 
+
+    private func cutChip_unused(index: Int, cut: ReviewCutState) -> some View {
+        let isActive = index == currentIndex
+        let previewKey = "preview-\(cut.opId)"
+        let isThisLoading = audio.currentKey == previewKey && audio.isLoading
+        let isThisPlaying = audio.currentKey == previewKey && audio.isPlaying
+        return Button {
+            appState.navigateTo(index)
+            transcriptFocused = true
+        } label: {
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 6) {
+                    Text("Cut \(index + 1)")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(cut.enabled ? Theme.ink : Theme.muted)
+                    Spacer(minLength: 8)
+                    if cut.source == .manual {
+                        Button {
+                            deleteCut(cut.opId)
+                        } label: {
+                            Image(systemName: "xmark")
+                                .font(.system(size: 9, weight: .bold))
+                                .foregroundStyle(Theme.muted)
+                                .frame(width: 16, height: 16)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .help("Delete this cut")
+                    }
+                    previewButton(cut: cut, key: previewKey,
+                                  isLoading: isThisLoading, isPlaying: isThisPlaying)
+                    Toggle(
+                        "",
+                        isOn: Binding(
+                            get: { cut.enabled },
+                            set: { appState.setCutEnabled(cut.opId, $0) }
+                        )
+                    )
+                    .labelsHidden()
+                    .toggleStyle(.switch)
+                    .controlSize(.mini)
+                }
+                cutSourceLabel(cut)
+                Text(Formatters.shortDuration(appState.estimatedDuration(cut)) + " removed")
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(cut.enabled ? Theme.danger : Theme.muted)
+            }
+            .padding(10)
+            .frame(width: 184, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: Theme.radius, style: .continuous)
+                    .fill(isActive ? Theme.wash : Theme.card)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: Theme.radius, style: .continuous)
+                            .stroke(isActive ? Theme.indigo : Theme.border, lineWidth: 1)
+                    )
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    /// Small play / loading-spinner / stop button for a cut chip.
+    @ViewBuilder
+    private func previewButton(
+        cut: ReviewCutState,
+        key: String,
+        isLoading: Bool,
+        isPlaying: Bool
+    ) -> some View {
+        Button {
+            if isLoading || isPlaying {
+                audio.stop()
+            } else {
+                playPreview(for: cut, key: key)
+            }
+        } label: {
+            ZStack {
+                if isLoading {
+                    ProgressView()
+                        .progressViewStyle(.circular)
+                        .controlSize(.mini)
+                        .tint(Theme.indigo)
+                } else if isPlaying {
+                    Image(systemName: "stop.fill")
+                        .font(.system(size: 8, weight: .bold))
+                        .foregroundStyle(Theme.indigo)
+                } else {
+                    Image(systemName: "play.fill")
+                        .font(.system(size: 8, weight: .bold))
+                        .foregroundStyle(Theme.indigo)
+                }
+            }
+            .frame(width: 22, height: 22)
+            .background(
+                RoundedRectangle(cornerRadius: Theme.radiusSmall, style: .continuous)
+                    .fill(isPlaying ? Theme.indigo.opacity(0.15) : Theme.elevated)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: Theme.radiusSmall, style: .continuous)
+                            .stroke(isPlaying ? Theme.indigo : Theme.border, lineWidth: 1)
+                    )
+            )
+        }
+        .buttonStyle(.plain)
+        .help(isPlaying ? "Stop preview" : "Preview this cut (2.5s before + 2.5s after)")
+        .animation(.easeOut(duration: 0.12), value: isLoading)
+        .animation(.easeOut(duration: 0.12), value: isPlaying)
+    }
+
+    private func playPreview(for cut: ReviewCutState, key: String) {
+        guard let input = appState.droppedFile,
+              let duration = appState.metadata?.durationSec
+        else { return }
+
+        // Use renderTimes (not sourceTimes) so the preview window is centred on the
+        // same boundaries the renderer will use. For unchanged AI cuts these are the
+        // silence-snapped op.start/op.end; for dragged or manual cuts they're word-onset
+        // times. Using sourceTimes (word-onset) here would offset the window from the
+        // actual cut boundary for unchanged AI cuts.
+        let (focusStart, focusEnd) = appState.renderTimes(for: cut)
+        guard focusEnd > focusStart else { return }
+
+        // Include the previewed cut even if disabled so the user hears what
+        // the boundary would sound like with it applied.
+        let cuts = appState.cutsAsSegments(including: cut.opId)
+        let silences = appState.silenceSegments
+        let leadInMs = appState.options.leadInMs
+        let tailOutMs = appState.options.tailOutMs
+        let engine = appState.engine!
+
+        audio.play(key: key) {
+            let clip = try await engine.extractEditedPreview(
+                input: input,
+                duration: duration,
+                focusStart: focusStart,
+                focusEnd: focusEnd,
+                padSec: 2.5,
+                tailSec: 2.5,
+                leadInMs: leadInMs,
+                tailOutMs: tailOutMs,
+                cuts: cuts,
+                silences: silences
+            )
+            return URL(fileURLWithPath: clip.path)
+        }
+    }
+
+    /// Second line of a cut chip: a "Manual" tag for user-created cuts, or the
+    /// AI confidence for suggested cuts.
+    @ViewBuilder
+    private func cutSourceLabel(_ cut: ReviewCutState) -> some View {
+        if cut.source == .manual {
+            Text("Manual")
+                .font(.system(size: 9, weight: .semibold))
+                .tracking(0.4)
+                .foregroundStyle(Theme.indigo)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 2)
+                .background(
+                    Capsule().fill(Theme.wash)
+                )
+        } else if let op = cut.op {
+            Text("\(Int(op.confidence))% confidence")
+                .font(.system(size: 10))
+                .foregroundStyle(Theme.muted)
+        }
+    }
+
+    /// Delete a cut (used by manual cuts only).
+    private func deleteCut(_ opId: String) {
+        appState.deleteCut(opId)
+    }
+
     // MARK: - Transcript
 
     private var transcriptPane: some View {
@@ -429,9 +601,9 @@ struct TranscriptReviewView: View {
         let silences = appState.silenceSegments
         let leadInMs = appState.options.leadInMs
         let tailOutMs = appState.options.tailOutMs
-        let sidecar = appState.sidecar!
+        let engine = appState.engine!
         audio.play(key: key) {
-            let clip = try await sidecar.extractEditedPreview(
+            let clip = try await engine.extractEditedPreview(
                 input: input, duration: duration,
                 focusStart: focusStart, focusEnd: focusEnd,
                 padSec: 2.5, tailSec: 2.5,
@@ -455,10 +627,10 @@ struct TranscriptReviewView: View {
         let cached = appState.videoPreviews[cut.opId]
         let cuts = appState.cutsAsSegments(including: cut.opId)
         let silences = appState.silenceSegments
-        let sidecar = appState.sidecar!
+        let engine = appState.engine!
         video.play(key: key) {
             if let clip = cached { return URL(fileURLWithPath: clip.path) }
-            let clip = try await sidecar.extractEditedVideoPreview(
+            let clip = try await engine.extractEditedVideoPreview(
                 input: input, duration: duration,
                 focusStart: focusStart, focusEnd: focusEnd,
                 cuts: cuts, silences: silences)
