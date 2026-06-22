@@ -1,4 +1,10 @@
 name: SmartCut
+
+packages:
+  Sparkle:
+    url: https://github.com/sparkle-project/Sparkle
+    from: "2.0.0"
+
 options:
   bundleIdPrefix: dev.jamesqquick
   createIntermediateGroups: true
@@ -36,6 +42,9 @@ targets:
         excludes:
           - "Info.plist"
           - "SmartCut.entitlements"
+    dependencies:
+      - package: Sparkle
+        product: Sparkle
     resources:
       - path: SmartCut/Assets.xcassets
     info:
@@ -49,6 +58,12 @@ targets:
         LSMinimumSystemVersion: "14.0"
         NSHighResolutionCapable: true
         NSPrincipalClass: NSApplication
+        # Sparkle auto-update feed URL (stable raw GitHub URL, updated by CI each release).
+        SUFeedURL: https://raw.githubusercontent.com/jamesqquick/SmartCut/main/docs/appcast.xml
+        # EdDSA public key for update signature verification.
+        # Generate with: ./bin/generate_keys (from a Sparkle release tarball).
+        # Store the private key as SPARKLE_PRIVATE_KEY in GitHub Actions secrets.
+        SUPublicEDKey: PkWoESqIh2Qu4y0cyLiQ4nHeJBeFRdBEfdib64AhRWw=
         # Allow drag-and-drop of media files of any type the user picks.
         CFBundleDocumentTypes:
           - CFBundleTypeName: Video
