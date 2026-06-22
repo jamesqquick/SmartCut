@@ -229,10 +229,14 @@ final class AppState {
 
     // --- dependencies ---
 
-    private(set) var sidecar: SidecarClient!
+    private(set) var engine: PipelineEngine!
+
+    /// Expose engine as `sidecar` so views that still use `appState.sidecar`
+    /// compile without modification during the transition.
+    var sidecar: PipelineEngine! { engine }
 
     /// Process-wide handle to the live AppState so `AppDelegate` can tear the
-    /// sidecar down on termination. Weak: AppState's lifetime is owned by the
+    /// engine down on termination. Weak: AppState's lifetime is owned by the
     /// SwiftUI `App`, not this reference. There is only ever one instance.
     static weak var shared: AppState?
 
@@ -244,30 +248,27 @@ final class AppState {
         self.needsFirstRunConfig = !loadedConfig.hasRequiredSecrets
         self.options = loadedPrefs.makeStartOptions()
 
-        // SidecarClient needs a reference back to us for event dispatch.
+        // PipelineEngine needs a reference back to us for event dispatch.
         // Capture-then-bind dance to avoid passing `self` before `self`
         // is fully initialized.
-        self.sidecar = SidecarClient(
-            config: .from(loadedConfig),
+        self.engine = PipelineEngine(
+            config: loadedConfig,
             onEvent: { [weak self] event in
                 Task { @MainActor in self?.handle(event: event) }
-            },
-            onExit: { [weak self] status in
-                Task { @MainActor in self?.handleSidecarExit(status: status) }
             }
         )
 
         AppState.shared = self
     }
 
-    /// Persist a new `AppConfig` and rebuild the sidecar so the new
-    /// node path / env reach the next spawn.
+    /// Persist a new `AppConfig` and rebuild the engine so the new credentials
+    /// take effect on the next job.
     func saveConfig(_ newConfig: AppConfig) {
         do {
             try newConfig.save()
             config = newConfig
             needsFirstRunConfig = !newConfig.hasRequiredSecrets
-            rebuildSidecar()
+            rebuildEngine()
         } catch {
             errorMessage = "Could not save config: \(error.localizedDescription)"
         }
@@ -283,31 +284,26 @@ final class AppState {
         }
     }
 
-    /// Tear down and recreate the SidecarClient. Called by the error
-    /// banner's "Restart sidecar" button.
+    /// Cancel any active run and reset the engine. Called by the error
+    /// banner's "Restart sidecar" button (label preserved for UI compat).
     func restartSidecar() {
-        rebuildSidecar()
+        rebuildEngine()
         errorMessage = nil
-        appendLog(.info, "Sidecar restarted")
+        appendLog(.info, "Engine restarted")
     }
 
     /// Dismiss the current error banner and return to the drop screen.
-    /// Rebuilds the sidecar silently so a crashed process is recovered
-    /// without exposing implementation details to the user.
     func dismissError() {
-        rebuildSidecar()
+        rebuildEngine()
         resetToDrop()
     }
 
-    private func rebuildSidecar() {
-        sidecar.stop()
-        sidecar = SidecarClient(
-            config: .from(config),
+    private func rebuildEngine() {
+        engine.stop()
+        engine = PipelineEngine(
+            config: config,
             onEvent: { [weak self] event in
                 Task { @MainActor in self?.handle(event: event) }
-            },
-            onExit: { [weak self] status in
-                Task { @MainActor in self?.handleSidecarExit(status: status) }
             }
         )
     }
@@ -324,7 +320,7 @@ final class AppState {
         options.output = defaultOutputPath(for: url)
 
         do {
-            let md = try await sidecar.getMetadata(path: url)
+            let md = try await engine.getMetadata(path: url)
             metadata = md
             // Stay on .drop; DropZoneView switches to its "ready to cut"
             // state when metadata is non-nil.
@@ -356,7 +352,7 @@ final class AppState {
         currentStage = nil
 
         do {
-            _ = try await sidecar.start(input: input, options: options)
+            _ = try await engine.start(input: input, options: options)
         } catch {
             errorMessage = error.localizedDescription
             appendLog(.err, error.localizedDescription)
@@ -388,7 +384,7 @@ final class AppState {
         appendLog(.info, "\(label) cut \(current.index + 1)/\(current.total)")
 
         do {
-            try await sidecar.decide(opId: current.id, action: action)
+            try await engine.decide(opId: current.id, action: action)
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -399,7 +395,7 @@ final class AppState {
         awaitingReviewConfirmation = false
         appendLog(.info, "No retakes — proceeding to render")
         do {
-            try await sidecar.decide(opId: "review-confirm", action: .approveRest)
+            try await engine.decide(opId: "review-confirm", action: .approveRest)
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -502,14 +498,14 @@ final class AppState {
         awaitingReviewConfirmation = false
         appendLog(.info, "Applying \(enabledCutCount) of \(reviewCuts.count) cut(s)")
         do {
-            try await sidecar.submitReview(cuts: cuts)
+            try await engine.submitReview(cuts: cuts)
         } catch {
             errorMessage = error.localizedDescription
         }
     }
 
     func cancel() async {
-        do { try await sidecar.cancel() } catch {
+        do { try await engine.cancel() } catch {
             errorMessage = error.localizedDescription
         }
         resetToDrop()
@@ -656,16 +652,11 @@ final class AppState {
         }
     }
 
+    // Engine does not exit; this method is kept for source compatibility only.
     private func handleSidecarExit(status: Int32) {
         guard status != 0 && summary == nil else { return }
-        let tail = sidecar.stderrSnapshot
-        let lastLine = tail
-            .split(separator: "\n")
-            .last(where: { !$0.trimmingCharacters(in: .whitespaces).isEmpty })
-            .map(String.init) ?? ""
-        let detail = lastLine.isEmpty ? "" : " — \(lastLine)"
-        errorMessage = "Sidecar exited unexpectedly (status \(status))\(detail)"
-        appendLog(.err, errorMessage ?? "Sidecar exited")
+        errorMessage = "Pipeline exited unexpectedly (status \(status))"
+        appendLog(.err, errorMessage ?? "Pipeline exited")
     }
 
     // MARK: - Convenience for the error banner
@@ -676,8 +667,8 @@ final class AppState {
         Array(activityLog.suffix(limit).reversed())
     }
 
-    /// Snapshot of the sidecar's stderr tail for the banner.
-    var sidecarStderrSnapshot: String { sidecar?.stderrSnapshot ?? "" }
+    /// Snapshot of recent process stderr for the banner.
+    var sidecarStderrSnapshot: String { engine?.stderrSnapshot ?? "" }
 
     // MARK: - Helpers
 
