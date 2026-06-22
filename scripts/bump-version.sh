@@ -33,7 +33,17 @@ grep -q 'CFBundleShortVersionString:' "$PROJECT_YML" \
 sed -i '' \
   "s/CFBundleShortVersionString: \"[^\"]*\"/CFBundleShortVersionString: \"${NEW_VERSION}\"/" \
   "$PROJECT_YML"
-echo "  updated: app/SmartCut/project.yml"
+
+# Increment the build number (CFBundleVersion) — Sparkle uses this integer,
+# not the marketing version, to determine whether an update is newer.
+grep -q 'CFBundleVersion:' "$PROJECT_YML" \
+  || { echo "error: CFBundleVersion not found in project.yml" >&2; exit 1; }
+CURRENT_BUILD=$(grep 'CFBundleVersion:' "$PROJECT_YML" | grep -oE '"[0-9]+"' | tr -d '"')
+NEW_BUILD=$((CURRENT_BUILD + 1))
+sed -i '' \
+  "s/CFBundleVersion: \"[^\"]*\"/CFBundleVersion: \"${NEW_BUILD}\"/" \
+  "$PROJECT_YML"
+echo "  updated: app/SmartCut/project.yml (version ${NEW_VERSION}, build ${NEW_BUILD})"
 
 # --- package.json files ---
 PACKAGE_FILES=(
@@ -53,7 +63,7 @@ for PKG in "${PACKAGE_FILES[@]}"; do
 done
 
 echo ""
-echo "Version bumped to ${NEW_VERSION}. Next steps:"
+echo "Version bumped to ${NEW_VERSION} (build ${NEW_BUILD}). Next steps:"
 echo "  git add -A"
 echo "  git commit -m \"chore: bump version to ${NEW_VERSION}\""
 echo "  git tag v${NEW_VERSION}"
