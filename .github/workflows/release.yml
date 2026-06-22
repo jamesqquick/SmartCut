@@ -184,15 +184,13 @@ jobs:
         env:
           SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
         run: |
-          # SPARKLE_PRIVATE_KEY is the raw base64 EdDSA key string as output by
-          # Sparkle's generate_keys tool — write it directly, no re-decoding.
-          printf '%s' "$SPARKLE_PRIVATE_KEY" > /tmp/sparkle_key
-          SIGN_OUT=$(sign_update /tmp/sparkle_key "$RUNNER_TEMP/SmartCut-update.zip")
+          # Sparkle 2.x sign_update: pass the base64 key via -s rather than
+          # as a positional argument (Sparkle 1.x syntax no longer works).
+          SIGN_OUT=$(sign_update -s "$SPARKLE_PRIVATE_KEY" "$RUNNER_TEMP/SmartCut-update.zip")
           ED_SIG=$(echo "$SIGN_OUT" | grep -oE 'edSignature="[^"]+"' | cut -d'"' -f2)
           FILE_SIZE=$(wc -c < "$RUNNER_TEMP/SmartCut-update.zip" | tr -d ' ')
           echo "ED_SIG=$ED_SIG"       >> "$GITHUB_ENV"
           echo "FILE_SIZE=$FILE_SIZE" >> "$GITHUB_ENV"
-          rm -f /tmp/sparkle_key
 
       - name: Update appcast.xml
         run: |
