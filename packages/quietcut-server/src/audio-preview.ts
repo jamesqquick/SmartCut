@@ -311,9 +311,7 @@ export async function extractEditedVideoPreview(
     (seg, i) =>
       `[0:a]atrim=start=${seg.start}:end=${seg.end},asetpts=PTS-STARTPTS[a${i}]`,
   );
-  const concatInputs = windowed
-    .map((_, i) => `[v${i}][a${i}]`)
-    .join("");
+  const concatInputs = windowed.map((_, i) => `[v${i}][a${i}]`).join("");
   const filterParts = [
     ...vParts,
     ...aParts,
@@ -324,15 +322,26 @@ export async function extractEditedVideoPreview(
   const result = await execa(
     "ffmpeg",
     [
-      "-hide_banner", "-y", "-i", input,
-      "-filter_complex", filter,
-      "-map", "[vout]",
-      "-map", "[aout]",
-      "-c:v", "libx264",
-      "-preset", "ultrafast",
-      "-crf", "28",
-      "-c:a", "aac",
-      "-movflags", "+faststart",
+      "-hide_banner",
+      "-y",
+      "-i",
+      input,
+      "-filter_complex",
+      filter,
+      "-map",
+      "[vout]",
+      "-map",
+      "[aout]",
+      "-c:v",
+      "libx264",
+      "-preset",
+      "ultrafast",
+      "-crf",
+      "28",
+      "-c:a",
+      "aac",
+      "-movflags",
+      "+faststart",
       outPath,
     ],
     { reject: false },
