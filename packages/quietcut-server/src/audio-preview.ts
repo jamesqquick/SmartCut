@@ -225,6 +225,134 @@ export async function extractEditedPreview(
   return { path: outPath, durationSec };
 }
 
+/**
+ * Render a faithful low-resolution video preview of a single cut boundary.
+ *
+ * Applies the exact same windowing and `planToKeepSegments` logic as
+ * `extractEditedPreview`, but outputs a **480p H.264/AAC mp4** instead of a
+ * WAV. The result is suitable for playback in an `AVPlayer` inside the review
+ * UI — the user sees and hears exactly the join the export will produce.
+ *
+ * The file is written to `$TMPDIR/smartcut-previews/` and scheduled for
+ * deletion after 5 minutes. Callers should treat the path as ephemeral.
+ */
+export async function extractEditedVideoPreview(
+  input: string,
+  duration: number,
+  focusStart: number,
+  focusEnd: number,
+  options: EditedPreviewOptions = {},
+): Promise<{ path: string; durationSec: number }> {
+  if (!Number.isFinite(duration) || duration <= 0) {
+    throw new Error("duration must be a positive finite number");
+  }
+  if (!Number.isFinite(focusStart) || !Number.isFinite(focusEnd)) {
+    throw new Error("focusStart and focusEnd must be finite numbers");
+  }
+  if (focusEnd <= focusStart) {
+    throw new Error(
+      `focusEnd (${focusEnd}) must be greater than focusStart (${focusStart})`,
+    );
+  }
+
+  const padSec = Math.max(0, options.padSec ?? 2.5);
+  const tailSec = Math.max(0, options.tailSec ?? 2.5);
+  const leadInMs = Math.max(0, options.leadInMs ?? 300);
+  const tailOutMs = Math.max(0, options.tailOutMs ?? 300);
+  const cuts = options.cuts ?? [];
+  const silences = options.silences ?? [];
+
+  const windowStart = Math.max(0, focusStart - padSec);
+  const windowEnd = Math.min(duration, focusEnd + tailSec);
+
+  const operations = [
+    ...cuts.map((s) => ({
+      type: "removeRetake" as const,
+      start: s.start,
+      end: s.end,
+      reason: "",
+      removedText: "",
+      keptText: "",
+      contextBefore: "",
+      contextAfter: "",
+      confidence: 100,
+    })),
+    ...silences.map((s) => ({
+      type: "removeSilence" as const,
+      start: s.start,
+      end: s.end,
+    })),
+  ];
+  const plan = buildEditPlan(input, duration, operations);
+  const keepAll = planToKeepSegments(plan, leadInMs, tailOutMs);
+
+  const windowed = keepAll
+    .map((seg) => ({
+      start: Math.max(seg.start, windowStart),
+      end: Math.min(seg.end, windowEnd),
+    }))
+    .filter((seg) => seg.end - seg.start > 1e-6);
+
+  if (windowed.length === 0) {
+    throw new Error(
+      "The preview window is entirely removed by the current edit plan. " +
+        "Enable at least one cut in the window or widen the preview.",
+    );
+  }
+
+  await ensureDir();
+  const outPath = join(PREVIEW_DIR, `video-preview-${randomUUID()}.mp4`);
+
+  const vParts: string[] = windowed.map(
+    (seg, i) =>
+      `[0:v]trim=start=${seg.start}:end=${seg.end},setpts=PTS-STARTPTS,scale=-2:480[v${i}]`,
+  );
+  const aParts: string[] = windowed.map(
+    (seg, i) =>
+      `[0:a]atrim=start=${seg.start}:end=${seg.end},asetpts=PTS-STARTPTS[a${i}]`,
+  );
+  const concatInputs = windowed
+    .map((_, i) => `[v${i}][a${i}]`)
+    .join("");
+  const filterParts = [
+    ...vParts,
+    ...aParts,
+    `${concatInputs}concat=n=${windowed.length}:v=1:a=1[vout][aout]`,
+  ];
+  const filter = filterParts.join(";");
+
+  const result = await execa(
+    "ffmpeg",
+    [
+      "-hide_banner", "-y", "-i", input,
+      "-filter_complex", filter,
+      "-map", "[vout]",
+      "-map", "[aout]",
+      "-c:v", "libx264",
+      "-preset", "ultrafast",
+      "-crf", "28",
+      "-c:a", "aac",
+      "-movflags", "+faststart",
+      outPath,
+    ],
+    { reject: false },
+  );
+
+  if (result.exitCode !== 0) {
+    throw new Error(
+      `ffmpeg extractEditedVideoPreview failed (code ${result.exitCode}):\n${result.stderr ?? ""}`,
+    );
+  }
+
+  const durationSec = windowed.reduce(
+    (sum, seg) => sum + (seg.end - seg.start),
+    0,
+  );
+
+  scheduleCleanup(outPath);
+  return { path: outPath, durationSec };
+}
+
 function scheduleCleanup(path: string): void {
   const timer = setTimeout(() => {
     rm(path, { force: true }).catch(() => {

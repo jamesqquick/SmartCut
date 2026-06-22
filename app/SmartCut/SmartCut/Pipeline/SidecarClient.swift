@@ -15,6 +15,12 @@ struct AudioClip: Decodable, Sendable {
     let durationSec: Double
 }
 
+/// A low-resolution mp4 preview clip returned by `extractEditedVideoPreview`.
+struct VideoClip: Decodable, Sendable {
+    let path: String
+    let durationSec: Double
+}
+
 struct StartOptions: Encodable, Sendable {
     var output: String
     var thresholdDb: Double = -30
@@ -401,6 +407,52 @@ final class SidecarClient {
         }
         return try await request(
             method: "extractEditedPreview",
+            params: P(
+                path: input.path,
+                duration: duration,
+                focusStart: focusStart,
+                focusEnd: focusEnd,
+                padSec: padSec,
+                tailSec: tailSec,
+                leadInMs: leadInMs,
+                tailOutMs: tailOutMs,
+                cuts: cuts,
+                silences: silences
+            )
+        )
+    }
+
+    /// Request a faithful low-resolution video preview of a single cut boundary.
+    ///
+    /// Identical window + `planToKeepSegments` logic as `extractEditedPreview`,
+    /// but the sidecar outputs a 480p H.264/AAC mp4 so the result can be played
+    /// back in a `VideoPreviewPlayer` / `AVPlayer` in the review UI.
+    func extractEditedVideoPreview(
+        input: URL,
+        duration: Double,
+        focusStart: Double,
+        focusEnd: Double,
+        padSec: Double = 2.5,
+        tailSec: Double = 2.5,
+        leadInMs: Int = 300,
+        tailOutMs: Int = 300,
+        cuts: [Segment] = [],
+        silences: [Segment] = []
+    ) async throws -> VideoClip {
+        struct P: Encodable {
+            let path: String
+            let duration: Double
+            let focusStart: Double
+            let focusEnd: Double
+            let padSec: Double
+            let tailSec: Double
+            let leadInMs: Int
+            let tailOutMs: Int
+            let cuts: [Segment]
+            let silences: [Segment]
+        }
+        return try await request(
+            method: "extractEditedVideoPreview",
             params: P(
                 path: input.path,
                 duration: duration,
