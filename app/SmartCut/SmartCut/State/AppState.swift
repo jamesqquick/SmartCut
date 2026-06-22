@@ -28,6 +28,13 @@ enum CutSource: Sendable {
     case manual
 }
 
+/// Per-cut review decision.
+enum ReviewStatus: Sendable {
+    case pending
+    case approved
+    case rejected
+}
+
 /// Mutable per-cut state for the batch transcript-review screen. AI cuts start
 /// from a Claude proposal; manual cuts are created by the user from a text
 /// selection. Either can be toggled off or have its word boundaries moved.
@@ -36,7 +43,8 @@ struct ReviewCutState: Identifiable, Sendable {
     /// The originating AI proposal, or `nil` for a manual cut.
     let op: RemoveRetakeOp?
     let source: CutSource
-    var enabled: Bool
+    /// User decision for this cut.
+    var status: ReviewStatus = .pending
     var removeStartIndex: Int  // inclusive transcript token index (current, may be dragged)
     var removeEndIndex: Int    // inclusive transcript token index (current, may be dragged)
     /// The proposal's original word indices, frozen at `reviewReady`. Used to
@@ -47,6 +55,11 @@ struct ReviewCutState: Identifiable, Sendable {
     let originalStartIndex: Int
     let originalEndIndex: Int
     var id: String { opId }
+    /// Whether this cut will be applied at render time.
+    var enabled: Bool {
+        get { status == .approved }
+        set { status = newValue ? .approved : .rejected }
+    }
 }
 
 struct RenderStats: Sendable {
@@ -135,6 +148,36 @@ final class AppState {
     /// RPC so the faithful preview can apply silence cuts within the window.
     var silenceSegments: [Segment] = []
 
+    /// Index of the cut currently shown in the review card.
+    var currentCutIndex: Int = 0
+
+    // MARK: - Review progress helpers
+
+    var reviewedCount: Int {
+        reviewCuts.filter { $0.status != .pending }.count
+    }
+
+    /// True when every cut has been approved or rejected — gates Render.
+    var allReviewed: Bool {
+        !reviewCuts.isEmpty && reviewCuts.allSatisfy { $0.status != .pending }
+    }
+
+    /// The index of the next pending cut after `index`. Returns `nil` if all reviewed.
+    func nextPendingIndex(after index: Int) -> Int? {
+        guard !reviewCuts.isEmpty else { return nil }
+        if let i = reviewCuts[(index + 1)...].indices.first(where: {
+            reviewCuts[$0].status == .pending
+        }) { return i }
+        if let i = reviewCuts[...index].indices.first(where: {
+            reviewCuts[$0].status == .pending
+        }) { return i }
+        return nil
+    }
+
+    /// Cache of prefetched video preview clips keyed by `opId`.
+    var videoPreviews: [String: VideoClip] = [:]
+    private var prefetchTask: Task<Void, Never>?
+
     var enabledCutCount: Int { reviewCuts.filter(\.enabled).count }
 
     /// Estimated total time removed by the currently-enabled cuts.
@@ -213,6 +256,71 @@ final class AppState {
     }
 
     var removedCount: Int { decisions.filter { $0.action == .remove }.count }
+
+    // MARK: - Video prefetch
+
+    func prefetchVideoPreview(forCutAt index: Int) {
+        guard
+            index >= 0, index < reviewCuts.count,
+            let file = droppedFile,
+            let duration = metadata?.durationSec
+        else { return }
+        let cut = reviewCuts[index]
+        if videoPreviews[cut.opId] != nil { return }
+        prefetchTask?.cancel()
+        // renderTimes (not sourceTimes): match the renderer's snapped boundaries
+        // so the prefetched clip is centred on the same window the on-demand
+        // render and the audio preview use.
+        let times = renderTimes(for: cut)
+        guard times.end > times.start else { return }
+        let cuts = cutsAsSegments(including: cut.opId)
+        let silences = silenceSegments
+        prefetchTask = Task { [weak self] in
+            guard let self else { return }
+            do {
+                let clip = try await self.engine.extractEditedVideoPreview(
+                    input: file,
+                    duration: duration,
+                    focusStart: times.start,
+                    focusEnd: times.end,
+                    cuts: cuts,
+                    silences: silences
+                )
+                try Task.checkCancellation()
+                await MainActor.run { self.videoPreviews[cut.opId] = clip }
+            } catch {
+                // Silent — UI falls back to on-demand render
+            }
+        }
+    }
+
+    // MARK: - Review navigation & decisions
+
+    func navigateTo(_ index: Int) {
+        guard reviewCuts.indices.contains(index) else { return }
+        currentCutIndex = index
+        let next = index + 1 < reviewCuts.count ? index + 1 : 0
+        prefetchVideoPreview(forCutAt: next)
+    }
+
+    func approveCurrent() {
+        guard reviewCuts.indices.contains(currentCutIndex) else { return }
+        reviewCuts[currentCutIndex].status = .approved
+        advanceAfterDecision()
+    }
+
+    func rejectCurrent() {
+        guard reviewCuts.indices.contains(currentCutIndex) else { return }
+        reviewCuts[currentCutIndex].status = .rejected
+        advanceAfterDecision()
+    }
+
+    private func advanceAfterDecision() {
+        if let next = nextPendingIndex(after: currentCutIndex) {
+            navigateTo(next)
+        }
+    }
+
     var keptCount: Int { decisions.filter { $0.action == .keep }.count }
     var savedSoFar: Double {
         decisions
@@ -464,7 +572,7 @@ final class AppState {
                 opId: opId,
                 op: nil,
                 source: .manual,
-                enabled: true,
+                status: .pending,
                 removeStartIndex: lo,
                 removeEndIndex: hi,
                 originalStartIndex: lo,
@@ -488,6 +596,7 @@ final class AppState {
         guard let i = reviewCuts.firstIndex(where: { $0.opId == opId }) else { return }
         let lower = i > 0 ? reviewCuts[i - 1].removeEndIndex + 1 : 0
         reviewCuts[i].removeStartIndex = max(lower, min(index, reviewCuts[i].removeEndIndex))
+        videoPreviews.removeValue(forKey: opId)
     }
 
     /// Move a cut's end boundary to `index`, clamped so it can't cross the
@@ -499,6 +608,7 @@ final class AppState {
             ? reviewCuts[i + 1].removeStartIndex - 1
             : transcript.count - 1
         reviewCuts[i].removeEndIndex = min(upper, max(index, reviewCuts[i].removeStartIndex))
+        videoPreviews.removeValue(forKey: opId)
     }
 
     /// Submit the (possibly adjusted) cuts and proceed to render.
@@ -604,7 +714,7 @@ final class AppState {
                     opId: $0.opId,
                     op: $0.op,
                     source: .ai,
-                    enabled: true,
+                    status: .pending,
                     removeStartIndex: $0.removeStartIndex,
                     removeEndIndex: $0.removeEndIndex,
                     originalStartIndex: $0.removeStartIndex,
@@ -697,6 +807,10 @@ final class AppState {
         transcript.removeAll()
         reviewCuts.removeAll()
         silenceSegments.removeAll()
+        currentCutIndex = 0
+        prefetchTask?.cancel()
+        prefetchTask = nil
+        videoPreviews.removeAll()
         manualCutCounter = 0
         decisions.removeAll()
         proposalDurations.removeAll()

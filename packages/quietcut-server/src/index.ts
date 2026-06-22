@@ -12,6 +12,7 @@ import {
   type EditedPreviewOptions,
   extractClip,
   extractEditedPreview,
+  extractEditedVideoPreview,
   extractStitchedClip,
 } from "./audio-preview.js";
 import { getMetadata } from "./metadata.js";
@@ -183,6 +184,9 @@ type ExtractEditedPreviewParams = {
   silences?: Segment[];
 };
 
+// Same shape as ExtractEditedPreviewParams — video preview uses identical args.
+type ExtractEditedVideoPreviewParams = ExtractEditedPreviewParams;
+
 const dispatcher = new RpcDispatcher();
 
 dispatcher.register("ping", async () => ({ pong: true }));
@@ -250,6 +254,36 @@ dispatcher.register("extractEditedPreview", async (params) => {
     silences: p.silences,
   };
   return await extractEditedPreview(
+    p.path,
+    p.duration,
+    p.focusStart,
+    p.focusEnd,
+    opts,
+  );
+});
+
+dispatcher.register("extractEditedVideoPreview", async (params) => {
+  const p = params as ExtractEditedVideoPreviewParams | undefined;
+  if (
+    !p?.path ||
+    typeof p.duration !== "number" ||
+    typeof p.focusStart !== "number" ||
+    typeof p.focusEnd !== "number"
+  ) {
+    throw new RpcDispatchError(
+      RPC_ERROR.invalidParams,
+      "extractEditedVideoPreview requires { path, duration, focusStart, focusEnd }",
+    );
+  }
+  const opts: EditedPreviewOptions = {
+    padSec: p.padSec,
+    tailSec: p.tailSec,
+    leadInMs: p.leadInMs,
+    tailOutMs: p.tailOutMs,
+    cuts: p.cuts,
+    silences: p.silences,
+  };
+  return await extractEditedVideoPreview(
     p.path,
     p.duration,
     p.focusStart,

@@ -121,6 +121,24 @@ final class PipelineEngine {
         return AudioClip(path: c.path, durationSec: c.durationSec)
     }
 
+    func extractEditedVideoPreview(
+        input: URL,
+        duration: Double,
+        focusStart: Double, focusEnd: Double,
+        padSec: Double = 2.5, tailSec: Double = 2.5,
+        leadInMs: Int = 300, tailOutMs: Int = 300,
+        cuts: [Segment] = [],
+        silences: [Segment] = []
+    ) async throws -> VideoClip {
+        try await Ffmpeg.extractEditedVideoPreview(
+            input: input.path, duration: duration,
+            focusStart: focusStart, focusEnd: focusEnd,
+            padSec: padSec, tailSec: tailSec,
+            leadInMs: Double(leadInMs), tailOutMs: Double(tailOutMs),
+            cuts: cuts, silences: silences,
+            runner: runner)
+    }
+
     @discardableResult
     func start(input: URL, options: StartOptions) async throws -> String {
         guard activeTask == nil else { return "current" }

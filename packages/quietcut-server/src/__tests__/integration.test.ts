@@ -278,6 +278,46 @@ describe("media handlers", () => {
       }),
     ).rejects.toThrow(/must be greater than/);
   });
+
+  it.skipIf(!hasFixture)(
+    "extractEditedVideoPreview writes an mp4 at the expected duration",
+    async () => {
+      const result = (await harness.request("extractEditedVideoPreview", {
+        path: FIXTURE,
+        duration: 60,
+        focusStart: 5,
+        focusEnd: 7,
+      })) as { path: string; durationSec: number };
+      expect(result.durationSec).toBeGreaterThan(0);
+      expect(result.durationSec).toBeLessThan(8);
+      expect(result.path).toMatch(/\.mp4$/);
+      expect(existsSync(result.path)).toBe(true);
+      await unlink(result.path).catch(() => undefined);
+    },
+  );
+});
+
+describe("video preview validation", () => {
+  it("rejects when focusEnd <= focusStart", async () => {
+    await expect(
+      harness.request("extractEditedVideoPreview", {
+        path: "/does/not/matter.mov",
+        duration: 60,
+        focusStart: 10,
+        focusEnd: 5,
+      }),
+    ).rejects.toThrow(/must be greater than/);
+  });
+
+  it("rejects missing required params", async () => {
+    await expect(
+      harness.request("extractEditedVideoPreview", {
+        path: "/does/not/matter.mov",
+        focusStart: 5,
+        focusEnd: 10,
+      }),
+    ).rejects.toThrow(/requires \{ path, duration, focusStart, focusEnd \}/);
+  });
 });
 
 describe("pipeline", () => {

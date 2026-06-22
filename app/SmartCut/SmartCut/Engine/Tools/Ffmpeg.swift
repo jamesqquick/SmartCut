@@ -389,4 +389,83 @@ enum Ffmpeg {
         let clipDuration = windowed.reduce(0.0) { $0 + ($1.end - $1.start) }
         return AudioClip(path: outPath, durationSec: clipDuration)
     }
+
+    /// Faithful **video** preview of a cut boundary: same windowing +
+    /// `planToKeepSegments` logic as `extractEditedPreview`, but outputs a
+    /// 480p H.264/AAC mp4 suitable for playback in `VideoPreviewPlayer`.
+    static func extractEditedVideoPreview(
+        input: String,
+        duration: Double,
+        focusStart: Double,
+        focusEnd: Double,
+        padSec: Double = 2.5,
+        tailSec: Double = 2.5,
+        leadInMs: Double = 300,
+        tailOutMs: Double = 300,
+        cuts: [Segment] = [],
+        silences: [Segment] = [],
+        runner: ProcessRunner
+    ) async throws -> VideoClip {
+        guard focusEnd > focusStart else {
+            throw EngineError.unexpectedOutput("extractEditedVideoPreview: focusEnd must be > focusStart")
+        }
+
+        let windowStart = max(0, focusStart - padSec)
+        let windowEnd   = min(duration, focusEnd + tailSec)
+
+        let operations: [EnginePlan.Op] =
+            cuts.map { .retake(RemoveRetakeOp(
+                type: "removeRetake", start: $0.start, end: $0.end,
+                reason: "", removedText: "", keptText: "",
+                contextBefore: "", contextAfter: "", confidence: 100)) } +
+            silences.map { .silence(RemoveSilenceOp(start: $0.start, end: $0.end)) }
+
+        let plan = buildEnginePlan(source: input, duration: duration, operations: operations)
+        let keepAll = planToKeepSegments(plan, leadInMs: leadInMs, tailOutMs: tailOutMs)
+
+        let windowed: [Segment] = keepAll.compactMap { seg in
+            let s = max(seg.start, windowStart)
+            let e = min(seg.end, windowEnd)
+            return e - s > 1e-6 ? Segment(start: s, end: e) : nil
+        }
+        guard !windowed.isEmpty else {
+            throw EngineError.unexpectedOutput(
+                "The preview window is entirely removed by the current edit plan.")
+        }
+
+        // Build filter_complex: trim+scale video and trim audio per segment, then concat.
+        let vParts = windowed.enumerated().map { i, seg in
+            "[0:v]trim=start=\(seg.start):end=\(seg.end),setpts=PTS-STARTPTS,scale=-2:480[v\(i)]"
+        }
+        let aParts = windowed.enumerated().map { i, seg in
+            "[0:a]atrim=start=\(seg.start):end=\(seg.end),asetpts=PTS-STARTPTS[a\(i)]"
+        }
+        let concatIn = windowed.indices.map { "[v\($0)][a\($0)]" }.joined()
+        let filter = (vParts + aParts + ["\(concatIn)concat=n=\(windowed.count):v=1:a=1[vout][aout]"])
+            .joined(separator: ";")
+
+        let outPath = previewDir + "/" + UUID().uuidString + "-video-preview.mp4"
+        let result = try await runner.run(
+            "ffmpeg",
+            args: [
+                "-hide_banner", "-y",
+                "-i", input,
+                "-filter_complex", filter,
+                "-map", "[vout]",
+                "-map", "[aout]",
+                "-c:v", "libx264", "-preset", "ultrafast", "-crf", "28",
+                "-c:a", "aac",
+                "-movflags", "+faststart",
+                outPath,
+            ],
+            allowNonZero: true
+        )
+        guard result.exitCode == 0 else {
+            throw EngineError.unexpectedOutput(
+                "ffmpeg extractEditedVideoPreview failed (code \(result.exitCode)):\n\(result.stderr)")
+        }
+        scheduleCleanup(outPath)
+        let clipDuration = windowed.reduce(0.0) { $0 + ($1.end - $1.start) }
+        return VideoClip(path: outPath, durationSec: clipDuration)
+    }
 }

@@ -16,6 +16,14 @@ struct VideoMetadata: Decodable, Sendable {
 
 // MARK: - AudioClip
 
+// MARK: - VideoClip
+
+/// A low-resolution mp4 preview clip produced by `extractEditedVideoPreview`.
+struct VideoClip: Sendable {
+    let path: String
+    let durationSec: Double
+}
+
 struct AudioClip: Decodable, Sendable {
     let path: String
     let durationSec: Double
