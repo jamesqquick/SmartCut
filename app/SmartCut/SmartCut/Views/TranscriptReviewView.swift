@@ -587,12 +587,6 @@ struct TranscriptReviewView: View {
 
     private func handleKey(_ press: KeyPress) -> KeyPress.Result {
         switch press.key {
-        case KeyEquivalent("j"):
-            if appState.currentCutIndex < cuts.count - 1 { appState.navigateTo(appState.currentCutIndex + 1) }
-            return .handled
-        case KeyEquivalent("k"):
-            if appState.currentCutIndex > 0 { appState.navigateTo(appState.currentCutIndex - 1) }
-            return .handled
         case .upArrow:
             if appState.currentCutIndex > 0 { appState.navigateTo(appState.currentCutIndex - 1) }
             return .handled
@@ -616,13 +610,13 @@ struct TranscriptReviewView: View {
         case .escape:
             if inspectOpen { inspectOpen = false; video.stop(); return .handled }
             return .ignored
-        // ⌃← / ⌃→  — nudge the START (beginning) of the cut
-        case .leftArrow where press.modifiers == .control:
+        // ⇧← / ⇧→  — nudge the START (beginning) of the cut
+        case .leftArrow where press.modifiers == .shift:
             guard let cut = currentCut else { return .ignored }
             appState.adjustCutStart(cut.opId, to: cut.removeStartIndex - 1)
             if inspectOpen { playVideoPreview() }
             return .handled
-        case .rightArrow where press.modifiers == .control:
+        case .rightArrow where press.modifiers == .shift:
             guard let cut = currentCut else { return .ignored }
             appState.adjustCutStart(cut.opId, to: cut.removeStartIndex + 1)
             if inspectOpen { playVideoPreview() }
