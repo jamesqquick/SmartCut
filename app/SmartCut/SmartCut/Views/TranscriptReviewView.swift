@@ -1,6 +1,5 @@
 import AppKit
 import AVFoundation
-import AVKit
 import SwiftUI
 
 struct TranscriptReviewView: View {
@@ -568,7 +567,7 @@ struct TranscriptReviewView: View {
         VStack(alignment: .leading, spacing: 6) {
             ZStack {
                 if let player = video.player {
-                    VideoPlayer(player: player)
+                    AVPlayerViewRepresentable(player: player)
                         .aspectRatio(16 / 10, contentMode: .fit)
                         .clipShape(RoundedRectangle(cornerRadius: Theme.radius, style: .continuous))
                     // Always-visible replay affordance once the clip finishes —
