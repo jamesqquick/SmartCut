@@ -12,6 +12,9 @@ struct TranscriptReviewView: View {
     @State private var inspectOpen = false
     @State private var selectionAnchor: Int?
     @State private var wordFrames: [Int: CGRect] = [:]
+    /// Cut boundaries captured at the start of a handle drag, used to detect
+    /// whether the drag actually moved anything (so we regen video only once).
+    @State private var preDragBounds: (start: Int, end: Int)?
     @FocusState private var transcriptFocused: Bool
 
     private var cuts: [ReviewCutState] { appState.reviewCuts }
@@ -135,178 +138,6 @@ struct TranscriptReviewView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 
-
-    private func cutChip_unused(index: Int, cut: ReviewCutState) -> some View {
-        let isActive = index == currentIndex
-        let previewKey = "preview-\(cut.opId)"
-        let isThisLoading = audio.currentKey == previewKey && audio.isLoading
-        let isThisPlaying = audio.currentKey == previewKey && audio.isPlaying
-        return Button {
-            appState.navigateTo(index)
-            transcriptFocused = true
-        } label: {
-            VStack(alignment: .leading, spacing: 6) {
-                HStack(spacing: 6) {
-                    Text("Cut \(index + 1)")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(cut.enabled ? Theme.ink : Theme.muted)
-                    Spacer(minLength: 8)
-                    if cut.source == .manual {
-                        Button {
-                            deleteCut(cut.opId)
-                        } label: {
-                            Image(systemName: "xmark")
-                                .font(.system(size: 9, weight: .bold))
-                                .foregroundStyle(Theme.muted)
-                                .frame(width: 16, height: 16)
-                                .contentShape(Rectangle())
-                        }
-                        .buttonStyle(.plain)
-                        .help("Delete this cut")
-                    }
-                    previewButton(cut: cut, key: previewKey,
-                                  isLoading: isThisLoading, isPlaying: isThisPlaying)
-                    Toggle(
-                        "",
-                        isOn: Binding(
-                            get: { cut.enabled },
-                            set: { appState.setCutEnabled(cut.opId, $0) }
-                        )
-                    )
-                    .labelsHidden()
-                    .toggleStyle(.switch)
-                    .controlSize(.mini)
-                }
-                cutSourceLabel(cut)
-                Text(Formatters.shortDuration(appState.estimatedDuration(cut)) + " removed")
-                    .font(.system(size: 10, weight: .medium))
-                    .foregroundStyle(cut.enabled ? Theme.danger : Theme.muted)
-            }
-            .padding(10)
-            .frame(width: 184, alignment: .leading)
-            .background(
-                RoundedRectangle(cornerRadius: Theme.radius, style: .continuous)
-                    .fill(isActive ? Theme.wash : Theme.card)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: Theme.radius, style: .continuous)
-                            .stroke(isActive ? Theme.indigo : Theme.border, lineWidth: 1)
-                    )
-            )
-        }
-        .buttonStyle(.plain)
-    }
-
-    /// Small play / loading-spinner / stop button for a cut chip.
-    @ViewBuilder
-    private func previewButton(
-        cut: ReviewCutState,
-        key: String,
-        isLoading: Bool,
-        isPlaying: Bool
-    ) -> some View {
-        Button {
-            if isLoading || isPlaying {
-                audio.stop()
-            } else {
-                playPreview(for: cut, key: key)
-            }
-        } label: {
-            ZStack {
-                if isLoading {
-                    ProgressView()
-                        .progressViewStyle(.circular)
-                        .controlSize(.mini)
-                        .tint(Theme.indigo)
-                } else if isPlaying {
-                    Image(systemName: "stop.fill")
-                        .font(.system(size: 8, weight: .bold))
-                        .foregroundStyle(Theme.indigo)
-                } else {
-                    Image(systemName: "play.fill")
-                        .font(.system(size: 8, weight: .bold))
-                        .foregroundStyle(Theme.indigo)
-                }
-            }
-            .frame(width: 22, height: 22)
-            .background(
-                RoundedRectangle(cornerRadius: Theme.radiusSmall, style: .continuous)
-                    .fill(isPlaying ? Theme.indigo.opacity(0.15) : Theme.elevated)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: Theme.radiusSmall, style: .continuous)
-                            .stroke(isPlaying ? Theme.indigo : Theme.border, lineWidth: 1)
-                    )
-            )
-        }
-        .buttonStyle(.plain)
-        .help(isPlaying ? "Stop preview" : "Preview this cut (2.5s before + 2.5s after)")
-        .animation(.easeOut(duration: 0.12), value: isLoading)
-        .animation(.easeOut(duration: 0.12), value: isPlaying)
-    }
-
-    private func playPreview(for cut: ReviewCutState, key: String) {
-        guard let input = appState.droppedFile,
-              let duration = appState.metadata?.durationSec
-        else { return }
-
-        // Use renderTimes (not sourceTimes) so the preview window is centred on the
-        // same boundaries the renderer will use. For unchanged AI cuts these are the
-        // silence-snapped op.start/op.end; for dragged or manual cuts they're word-onset
-        // times. Using sourceTimes (word-onset) here would offset the window from the
-        // actual cut boundary for unchanged AI cuts.
-        let (focusStart, focusEnd) = appState.renderTimes(for: cut)
-        guard focusEnd > focusStart else { return }
-
-        // Include the previewed cut even if disabled so the user hears what
-        // the boundary would sound like with it applied.
-        let cuts = appState.cutsAsSegments(including: cut.opId)
-        let silences = appState.silenceSegments
-        let leadInMs = appState.options.leadInMs
-        let tailOutMs = appState.options.tailOutMs
-        let engine = appState.engine!
-
-        audio.play(key: key) {
-            let clip = try await engine.extractEditedPreview(
-                input: input,
-                duration: duration,
-                focusStart: focusStart,
-                focusEnd: focusEnd,
-                padSec: 2.5,
-                tailSec: 2.5,
-                leadInMs: leadInMs,
-                tailOutMs: tailOutMs,
-                cuts: cuts,
-                silences: silences
-            )
-            return URL(fileURLWithPath: clip.path)
-        }
-    }
-
-    /// Second line of a cut chip: a "Manual" tag for user-created cuts, or the
-    /// AI confidence for suggested cuts.
-    @ViewBuilder
-    private func cutSourceLabel(_ cut: ReviewCutState) -> some View {
-        if cut.source == .manual {
-            Text("Manual")
-                .font(.system(size: 9, weight: .semibold))
-                .tracking(0.4)
-                .foregroundStyle(Theme.indigo)
-                .padding(.horizontal, 6)
-                .padding(.vertical, 2)
-                .background(
-                    Capsule().fill(Theme.wash)
-                )
-        } else if let op = cut.op {
-            Text("\(Int(op.confidence))% confidence")
-                .font(.system(size: 10))
-                .foregroundStyle(Theme.muted)
-        }
-    }
-
-    /// Delete a cut (used by manual cuts only).
-    private func deleteCut(_ opId: String) {
-        appState.deleteCut(opId)
-    }
-
     // MARK: - Transcript
 
     private var transcriptPane: some View {
@@ -424,19 +255,45 @@ struct TranscriptReviewView: View {
            let startFrame = wordFrames[cut.removeStartIndex],
            let endFrame = wordFrames[cut.removeEndIndex] {
             let hitWidth = boundaryHitWidth(startFrame: startFrame, endFrame: endFrame)
-            BoundaryHandle(boundaryX: startFrame.minX, top: startFrame.minY,
-                           height: startFrame.height, hitWidth: hitWidth) { value in
-                if let idx = nearestWordIndex(to: value.location) {
-                    appState.adjustCutStart(cut.opId, to: idx)
-                }
-            }
-            BoundaryHandle(boundaryX: endFrame.maxX, top: endFrame.minY,
-                           height: endFrame.height, hitWidth: hitWidth) { value in
-                if let idx = nearestWordIndex(to: value.location) {
-                    appState.adjustCutEnd(cut.opId, to: idx)
-                }
-            }
+            BoundaryHandle(
+                boundaryX: startFrame.minX, top: startFrame.minY,
+                height: startFrame.height, hitWidth: hitWidth,
+                onDrag: { value in
+                    if preDragBounds == nil {
+                        preDragBounds = (cut.removeStartIndex, cut.removeEndIndex)
+                    }
+                    if let idx = nearestWordIndex(to: value.location) {
+                        appState.adjustCutStart(cut.opId, to: idx)
+                    }
+                },
+                onEnded: { regenerateVideoAfterDrag(cut.opId) }
+            )
+            BoundaryHandle(
+                boundaryX: endFrame.maxX, top: endFrame.minY,
+                height: endFrame.height, hitWidth: hitWidth,
+                onDrag: { value in
+                    if preDragBounds == nil {
+                        preDragBounds = (cut.removeStartIndex, cut.removeEndIndex)
+                    }
+                    if let idx = nearestWordIndex(to: value.location) {
+                        appState.adjustCutEnd(cut.opId, to: idx)
+                    }
+                },
+                onEnded: { regenerateVideoAfterDrag(cut.opId) }
+            )
         }
+    }
+
+    /// On drag-end: if the boundaries actually moved and the video panel is open,
+    /// re-render the clip (showing the loading state). Single render per drag.
+    private func regenerateVideoAfterDrag(_ opId: String) {
+        defer { preDragBounds = nil }
+        guard inspectOpen,
+              let snapshot = preDragBounds,
+              let cut = currentCut, cut.opId == opId,
+              cut.removeStartIndex != snapshot.start || cut.removeEndIndex != snapshot.end
+        else { return }
+        playVideoPreview()
     }
 
     private func boundaryHitWidth(startFrame: CGRect, endFrame: CGRect) -> CGFloat {
@@ -595,7 +452,9 @@ struct TranscriptReviewView: View {
         guard let cut = currentCut, let input = appState.droppedFile,
               let duration = appState.metadata?.durationSec else { return }
         let key = "preview-\(cut.opId)"
-        let (focusStart, focusEnd) = appState.sourceTimes(for: cut)
+        // renderTimes (not sourceTimes): centres the window on the silence-snapped
+        // boundaries the renderer uses for unchanged AI cuts.
+        let (focusStart, focusEnd) = appState.renderTimes(for: cut)
         guard focusEnd > focusStart else { return }
         let cuts = appState.cutsAsSegments(including: cut.opId)
         let silences = appState.silenceSegments
@@ -622,7 +481,8 @@ struct TranscriptReviewView: View {
         guard let cut = currentCut, let input = appState.droppedFile,
               let duration = appState.metadata?.durationSec else { return }
         let key = "video-\(cut.opId)"
-        let (focusStart, focusEnd) = appState.sourceTimes(for: cut)
+        // renderTimes (not sourceTimes): match the renderer's snapped boundaries.
+        let (focusStart, focusEnd) = appState.renderTimes(for: cut)
         guard focusEnd > focusStart else { return }
         let cached = appState.videoPreviews[cut.opId]
         let cuts = appState.cutsAsSegments(including: cut.opId)
@@ -644,8 +504,7 @@ struct TranscriptReviewView: View {
         VStack(alignment: .leading, spacing: 0) {
             Divider().background(Theme.border)
             HStack(alignment: .top, spacing: 16) {
-                videoPlayerView.frame(maxWidth: 380)
-                if let cut = currentCut { wordTrimControls(cut: cut) }
+                videoPlayerView.frame(maxWidth: 460)
                 Spacer()
             }
             .padding(16)
@@ -656,48 +515,37 @@ struct TranscriptReviewView: View {
     @ViewBuilder
     private var videoPlayerView: some View {
         VStack(alignment: .leading, spacing: 6) {
-            if let player = video.player {
-                VideoPlayer(player: player)
-                    .aspectRatio(16 / 10, contentMode: .fit)
-                    .clipShape(RoundedRectangle(cornerRadius: Theme.radius, style: .continuous))
-            } else if video.isLoading {
-                RoundedRectangle(cornerRadius: Theme.radius, style: .continuous)
-                    .fill(Theme.elevated).aspectRatio(16 / 10, contentMode: .fit)
-                    .overlay(ProgressView().tint(Theme.indigo))
-            } else {
-                RoundedRectangle(cornerRadius: Theme.radius, style: .continuous)
-                    .fill(Theme.elevated).aspectRatio(16 / 10, contentMode: .fit)
-                    .overlay(Text("Press V to preview the resulting clip")
-                        .font(.system(size: 12)).foregroundStyle(Theme.muted))
+            ZStack {
+                if let player = video.player {
+                    VideoPlayer(player: player)
+                        .aspectRatio(16 / 10, contentMode: .fit)
+                        .clipShape(RoundedRectangle(cornerRadius: Theme.radius, style: .continuous))
+                    // Always-visible replay affordance once the clip finishes —
+                    // AVKit's own controls only appear on hover.
+                    if !video.isPlaying && !video.isLoading {
+                        Button { playVideoPreview() } label: {
+                            Image(systemName: "arrow.counterclockwise.circle.fill")
+                                .font(.system(size: 40))
+                                .foregroundStyle(.white.opacity(0.92))
+                                .shadow(radius: 6)
+                        }
+                        .buttonStyle(.plain)
+                        .help("Replay (V)")
+                    }
+                } else if video.isLoading {
+                    RoundedRectangle(cornerRadius: Theme.radius, style: .continuous)
+                        .fill(Theme.elevated).aspectRatio(16 / 10, contentMode: .fit)
+                        .overlay(ProgressView().tint(Theme.indigo))
+                } else {
+                    RoundedRectangle(cornerRadius: Theme.radius, style: .continuous)
+                        .fill(Theme.elevated).aspectRatio(16 / 10, contentMode: .fit)
+                        .overlay(Text("Press V to preview the resulting clip")
+                            .font(.system(size: 12)).foregroundStyle(Theme.muted))
+                }
             }
-            Text("480p preview · ±2.5s around the cut point")
+            Text("480p preview · ±2.5s around the cut point · V to replay")
                 .font(.system(size: 10)).foregroundStyle(Theme.muted)
         }
-    }
-
-    @ViewBuilder
-    private func wordTrimControls(cut: ReviewCutState) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("Trim boundaries")
-                .font(.system(size: 11, weight: .semibold)).foregroundStyle(Theme.muted)
-            HStack(spacing: 8) {
-                Text("Start").font(.system(size: 11)).foregroundStyle(Theme.muted).frame(width: 32, alignment: .leading)
-                Button("−1 word") { appState.adjustCutStart(cut.opId, to: cut.removeStartIndex - 1); if inspectOpen { playVideoPreview() } }.buttonStyle(.scNeutralCompact)
-                Button("+1 word") { appState.adjustCutStart(cut.opId, to: cut.removeStartIndex + 1); if inspectOpen { playVideoPreview() } }.buttonStyle(.scNeutralCompact)
-            }
-            HStack(spacing: 8) {
-                Text("End").font(.system(size: 11)).foregroundStyle(Theme.muted).frame(width: 32, alignment: .leading)
-                Button("−1 word") { appState.adjustCutEnd(cut.opId, to: cut.removeEndIndex - 1); if inspectOpen { playVideoPreview() } }.buttonStyle(.scNeutralCompact)
-                Button("+1 word") { appState.adjustCutEnd(cut.opId, to: cut.removeEndIndex + 1); if inspectOpen { playVideoPreview() } }.buttonStyle(.scNeutralCompact)
-            }
-        }
-        .padding(12)
-        .background(
-            RoundedRectangle(cornerRadius: Theme.radius, style: .continuous)
-                .fill(Theme.elevated)
-                .overlay(RoundedRectangle(cornerRadius: Theme.radius, style: .continuous)
-                    .stroke(Theme.border, lineWidth: 1))
-        )
     }
 
     // MARK: - Keyboard
@@ -726,17 +574,24 @@ struct TranscriptReviewView: View {
             if audio.isPlaying || audio.isLoading { audio.stop() } else { playAudioPreview() }
             return .handled
         case KeyEquivalent("v") where press.modifiers.isEmpty:
-            toggleInspect()
+            // V always shows + (re)plays the clip; it never closes the panel.
+            if !inspectOpen { inspectOpen = true }
+            playVideoPreview()
             return .handled
+        case .escape:
+            if inspectOpen { inspectOpen = false; video.stop(); return .handled }
+            return .ignored
         case .leftArrow:
             guard let cut = currentCut else { return .ignored }
             if press.modifiers.contains(.option) { appState.adjustCutStart(cut.opId, to: cut.removeStartIndex - 1) }
             else { appState.adjustCutEnd(cut.opId, to: cut.removeEndIndex - 1) }
+            if inspectOpen { playVideoPreview() }
             return .handled
         case .rightArrow:
             guard let cut = currentCut else { return .ignored }
             if press.modifiers.contains(.option) { appState.adjustCutStart(cut.opId, to: cut.removeStartIndex + 1) }
             else { appState.adjustCutEnd(cut.opId, to: cut.removeEndIndex + 1) }
+            if inspectOpen { playVideoPreview() }
             return .handled
         default:
             return .ignored
@@ -748,7 +603,9 @@ struct TranscriptReviewView: View {
 
 private struct BoundaryHandle: View {
     let boundaryX: CGFloat; let top: CGFloat; let height: CGFloat
-    let hitWidth: CGFloat; let onDrag: (DragGesture.Value) -> Void
+    let hitWidth: CGFloat
+    let onDrag: (DragGesture.Value) -> Void
+    var onEnded: () -> Void = {}
     @State private var hovering = false
 
     var body: some View {
@@ -771,7 +628,11 @@ private struct BoundaryHandle: View {
             if inside { NSCursor.resizeLeftRight.push() } else { NSCursor.pop() }
         }
         .onDisappear { if hovering { NSCursor.pop(); hovering = false } }
-        .gesture(DragGesture(coordinateSpace: .named("tx")).onChanged(onDrag))
+        .gesture(
+            DragGesture(coordinateSpace: .named("tx"))
+                .onChanged(onDrag)
+                .onEnded { _ in onEnded() }
+        )
     }
 }
 

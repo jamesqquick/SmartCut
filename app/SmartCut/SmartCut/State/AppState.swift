@@ -268,7 +268,10 @@ final class AppState {
         let cut = reviewCuts[index]
         if videoPreviews[cut.opId] != nil { return }
         prefetchTask?.cancel()
-        let times = sourceTimes(for: cut)
+        // renderTimes (not sourceTimes): match the renderer's snapped boundaries
+        // so the prefetched clip is centred on the same window the on-demand
+        // render and the audio preview use.
+        let times = renderTimes(for: cut)
         guard times.end > times.start else { return }
         let cuts = cutsAsSegments(including: cut.opId)
         let silences = silenceSegments
