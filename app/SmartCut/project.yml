@@ -52,8 +52,8 @@ targets:
       properties:
         CFBundleName: SmartCut
         CFBundleDisplayName: SmartCut
-        CFBundleShortVersionString: "0.1.1"
-        CFBundleVersion: "1"
+        CFBundleShortVersionString: "0.2.0"
+        CFBundleVersion: "2"
         CFBundleIconName: AppIcon
         LSMinimumSystemVersion: "14.0"
         NSHighResolutionCapable: true

@@ -1,6 +1,6 @@
 {
   "name": "quietcut-core",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "private": true,
   "description": "Core pipeline library for SmartCut — silence + retake detection and rendering.",
   "type": "module",
