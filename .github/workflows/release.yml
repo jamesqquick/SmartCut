@@ -184,7 +184,9 @@ jobs:
         env:
           SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
         run: |
-          echo "$SPARKLE_PRIVATE_KEY" | base64 --decode -o /tmp/sparkle_key
+          # SPARKLE_PRIVATE_KEY is the raw base64 EdDSA key string as output by
+          # Sparkle's generate_keys tool — write it directly, no re-decoding.
+          printf '%s' "$SPARKLE_PRIVATE_KEY" > /tmp/sparkle_key
           SIGN_OUT=$(sign_update /tmp/sparkle_key "$RUNNER_TEMP/SmartCut-update.zip")
           ED_SIG=$(echo "$SIGN_OUT" | grep -oE 'edSignature="[^"]+"' | cut -d'"' -f2)
           FILE_SIZE=$(wc -c < "$RUNNER_TEMP/SmartCut-update.zip" | tr -d ' ')
