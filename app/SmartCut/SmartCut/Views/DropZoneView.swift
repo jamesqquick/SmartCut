@@ -143,7 +143,7 @@ struct DropZoneView: View {
                         )
                 )
         )
-        .onDrop(of: [UTType.movie, UTType.video, UTType.fileURL], isTargeted: $isTargeted) { providers in
+        .onDrop(of: [UTType.movie, UTType.video, UTType.mpeg4Movie, UTType.quickTimeMovie, UTType.fileURL], isTargeted: $isTargeted) { providers in
             handleDrop(providers: providers)
         }
     }
@@ -312,23 +312,25 @@ struct DropZoneView: View {
         }
     }
 
+    private static let supportedExtensions: Set<String> = ["mp4", "mov", "mkv", "webm"]
+
     private func handleDrop(providers: [NSItemProvider]) -> Bool {
         guard let provider = providers.first else { return false }
-        let typeIdentifier = UTType.fileURL.identifier
-        guard provider.hasItemConformingToTypeIdentifier(typeIdentifier) else { return false }
-        provider.loadItem(forTypeIdentifier: typeIdentifier, options: nil) { item, _ in
-            let resolved: URL?
-            if let url = item as? URL {
-                resolved = url
-            } else if let data = item as? Data {
-                resolved = URL(dataRepresentation: data, relativeTo: nil)
-            } else {
-                resolved = nil
-            }
-            guard let url = resolved else { return }
-            Task { @MainActor in await load(url: url) }
+        _ = provider.loadObject(ofClass: URL.self) { url, _ in
+            guard let url else { return }
+            Task { @MainActor in await handleResolvedDrop(url) }
         }
         return true
+    }
+
+    @MainActor
+    private func handleResolvedDrop(_ url: URL) async {
+        let ext = url.pathExtension.lowercased()
+        guard Self.supportedExtensions.contains(ext) else {
+            appState.errorMessage = "Unsupported file type: .\(ext). Supported formats: .mp4, .mov, .mkv, .webm"
+            return
+        }
+        await load(url: url)
     }
 
     @MainActor
