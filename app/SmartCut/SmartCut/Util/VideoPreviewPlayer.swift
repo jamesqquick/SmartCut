@@ -6,8 +6,9 @@ import Observation
 ///
 /// Mirrors the `key/loader` pattern from `AudioPlayer` so views can drive
 /// playback the same way: call `play(key:loader:)` with a closure that
-/// returns the local mp4 URL (from the sidecar). Playing a different key
-/// stops the current clip; calling the same key again toggles pause/resume.
+/// returns the local mp4 URL. Every call loads a fresh clip — the inspect
+/// panel always wants the current boundary's render, and AVKit's `VideoPlayer`
+/// provides its own play/pause/scrub transport within the loaded clip.
 @MainActor
 @Observable
 final class VideoPreviewPlayer {
@@ -31,21 +32,9 @@ final class VideoPreviewPlayer {
         key: String,
         loader: @escaping () async throws -> URL
     ) {
-        // Same key already playing → pause (toggle).
-        if currentKey == key, isPlaying {
-            player?.pause()
-            isPlaying = false
-            return
-        }
-
-        // Same key paused → resume from current position.
-        if currentKey == key, !isLoading {
-            player?.play()
-            isPlaying = true
-            return
-        }
-
-        // New key → cancel any in-flight load and swap the player.
+        // Always cancel any in-flight load and tear down the old clip, then
+        // load fresh. The boundary may have changed since the last render, so
+        // we never reuse the existing player. (stop() also clears currentKey.)
         stop()
         currentKey = key
         isLoading = true
@@ -77,6 +66,7 @@ final class VideoPreviewPlayer {
         loadTask?.cancel()
         loadTask = nil
         tearDownPlayer()
+        currentKey = nil
         isPlaying = false
         isLoading = false
     }
