@@ -19,6 +19,15 @@ final class PipelineEngine {
     /// Ring buffer of recent process stderr (mirrors sidecar stderrTail).
     private(set) var stderrSnapshot = ""
 
+    // MARK: - Export state
+
+    /// Output path and model from the most recently completed render, used for
+    /// on-demand transcript export from the Done screen. Cleared when a new run starts.
+    private var lastOutputPath: String?
+    private var lastWhisperModel: String = "base.en"
+    /// Cached re-transcription of the final video; populated lazily on first export click.
+    private var cachedExportTokens: [TranscriptToken]?
+
     // MARK: - Review gate (batch flow)
 
     private enum ReviewDecision {
@@ -142,6 +151,8 @@ final class PipelineEngine {
     @discardableResult
     func start(input: URL, options: StartOptions) async throws -> String {
         guard activeTask == nil else { return "current" }
+        lastOutputPath = nil
+        cachedExportTokens = nil
         guard let gw = gatewayConfig else {
             throw EngineError.missingCredentials(
                 "AI Gateway credentials not configured. Open Settings → Credentials.")
@@ -380,12 +391,64 @@ final class PipelineEngine {
         stageDone(.render, "Render complete (\(String(format: "%.1f", Double(renderMs)/1000))s).", ms: renderMs)
 
         let elapsedSec = -start.timeIntervalSinceNow
+
+        // Capture state for transcript export; clear any stale cache from a prior run.
+        await MainActor.run {
+            lastOutputPath = options.output
+            lastWhisperModel = options.whisperModel
+            cachedExportTokens = nil
+        }
+
         emit(.done(
             plan: plan.toDonePlan(),
             output: options.output,
             savedSec: savedSec,
             savedPercent: savedPercent,
             elapsedSec: elapsedSec))
+    }
+}
+
+// MARK: - Transcript export
+
+extension PipelineEngine {
+
+    /// True once a finished render exists whose audio we can re-transcribe.
+    var canExportTranscript: Bool { lastOutputPath != nil }
+
+    /// Re-transcribe the final rendered video and write the transcript to `url`
+    /// in the requested format. Caches the transcription so a second format
+    /// request doesn't re-run whisper.
+    func exportTranscript(format: TranscriptExportFormat, to url: URL) async throws {
+        guard let outputPath = lastOutputPath else {
+            throw EngineError.transcriptionFailed("No finished render available to export.")
+        }
+
+        // Use cached tokens if we already transcribed this run.
+        let words: [TranscriptToken]
+        if let cached = cachedExportTokens {
+            words = cached
+        } else {
+            let whisperBin = try await Whisper.assertAvailable(runner: runner)
+            let audio = try await Ffmpeg.extractAudio(input: outputPath, runner: runner)
+            defer { try? audio.cleanup() }
+            let rawTokens = try await transcribeFromAudio(
+                wavPath: audio.wavPath,
+                whisperBin: whisperBin,
+                model: lastWhisperModel,
+                runner: runner
+            )
+            let merged = mergeSubwordTokens(rawTokens)
+            words = merged.map { TranscriptToken(word: $0.word, start: $0.start, end: $0.end) }
+            cachedExportTokens = words
+        }
+
+        let text: String
+        switch format {
+        case .srt:  text = TranscriptFormatter.srt(words: words)
+        case .aiJson: text = TranscriptFormatter.aiJson(words: words, source: (lastOutputPath! as NSString).lastPathComponent)
+        }
+
+        try text.write(to: url, atomically: true, encoding: .utf8)
     }
 }
 

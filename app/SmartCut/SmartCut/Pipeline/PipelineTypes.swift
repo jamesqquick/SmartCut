@@ -51,6 +51,16 @@ struct StartOptions: Encodable, Sendable {
     var preset: String = "medium"
 }
 
+// MARK: - TranscriptExportFormat
+
+/// Transcript export formats, both aligned to the final edited timeline.
+enum TranscriptExportFormat: String, Sendable {
+    case aiJson = "ai-json"  // structured segments + words for AI editing
+    case srt                 // YouTube SubRip caption track
+
+    var fileExtension: String { self == .aiJson ? "json" : "srt" }
+}
+
 // MARK: - Engine errors surfaced to the UI
 
 enum EngineUIError: Error, LocalizedError {

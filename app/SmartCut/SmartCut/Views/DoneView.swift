@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct DoneView: View {
     @Environment(AppState.self) private var appState
@@ -47,7 +48,7 @@ struct DoneView: View {
         VStack(spacing: 0) {
             Spacer()
             card
-                .frame(maxWidth: 560)
+                .frame(maxWidth: 600)
             Spacer()
         }
         .padding(.horizontal, 36)
@@ -64,29 +65,14 @@ struct DoneView: View {
     @ViewBuilder
     private var card: some View {
         if let summary = appState.summary {
-            VStack(spacing: 20) {
+            VStack(spacing: 18) {
                 checkmark
                 Text("Smart cut complete")
-                    .font(.system(size: 26, weight: .light))
+                    .font(.system(size: 24, weight: .light))
                     .gradientTitle(colorScheme)
-                HStack(spacing: 4) {
-                    Text("Saved to").foregroundStyle(Theme.muted)
-                    Text(summary.outputPath.path)
-                        .font(.system(size: 12, design: .monospaced))
-                        .foregroundStyle(Theme.bodyText)
-                }
-                .font(.system(size: 13))
 
-                summaryGrid(summary: summary)
-
-                Text(detailLine(summary: summary))
-                    .font(.system(size: 12))
-                    .foregroundStyle(Theme.muted)
-                    .multilineTextAlignment(.center)
-                    .padding(.top, 2)
-
-                actionButtons(summary: summary)
-                    .padding(.top, 8)
+                videoPanel(summary: summary)
+                exportPanel(summary: summary)
             }
             .padding(28)
             .frame(maxWidth: .infinity)
@@ -107,10 +93,69 @@ struct DoneView: View {
     private var checkmark: some View {
         ZStack {
             Circle().fill(Theme.wash)
-                .frame(width: 64, height: 64)
+                .frame(width: 56, height: 56)
             Image(systemName: "checkmark")
-                .font(.system(size: 26, weight: .medium))
+                .font(.system(size: 24, weight: .medium))
                 .foregroundStyle(Theme.indigo)
+        }
+    }
+
+    // MARK: - Panels
+
+    /// Shared boxed panel: a `--card` surface with a hairline border, matching
+    /// the mockup's `.panel`.
+    private func panel<Content: View>(
+        @ViewBuilder _ content: () -> Content
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            content()
+        }
+        .padding(20)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: Theme.radius, style: .continuous)
+                .fill(Theme.card)
+                .overlay(
+                    RoundedRectangle(cornerRadius: Theme.radius, style: .continuous)
+                        .stroke(Theme.border, lineWidth: 1)
+                )
+        )
+    }
+
+    private func panelHeader(icon: String, title: String) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: icon)
+                .font(.system(size: 15))
+                .foregroundStyle(Theme.indigo)
+            Text(title)
+                .font(.system(size: 15, weight: .medium))
+                .foregroundStyle(Theme.ink)
+        }
+    }
+
+    // MARK: Video panel
+
+    private func videoPanel(summary: DoneSummary) -> some View {
+        panel {
+            panelHeader(icon: "video", title: "Video")
+
+            HStack(spacing: 4) {
+                Text("Saved to").foregroundStyle(Theme.muted)
+                Text(summary.outputPath.path)
+                    .font(.system(size: 12, design: .monospaced))
+                    .foregroundStyle(Theme.bodyText)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+            }
+            .font(.system(size: 13))
+
+            summaryGrid(summary: summary)
+            Text(detailLine(summary: summary))
+                .font(.system(size: 12))
+                .foregroundStyle(Theme.muted)
+
+            actionButtons(summary: summary)
+                .padding(.top, 2)
         }
     }
 
@@ -140,7 +185,7 @@ struct DoneView: View {
                 .tracking(0.8)
                 .foregroundStyle(Theme.muted)
             Text(value)
-                .font(.system(size: 16, weight: .regular))
+                .font(.system(size: 18, weight: .regular))
                 .foregroundStyle(tint)
                 .monospacedDigit()
         }
@@ -171,7 +216,7 @@ struct DoneView: View {
             Button {
                 NSWorkspace.shared.activateFileViewerSelecting([summary.outputPath])
             } label: {
-                Text("Reveal in Finder")
+                Text("Reveal video")
             }
             .buttonStyle(.scPrimary)
             .keyboardShortcut(.defaultAction)
@@ -189,6 +234,115 @@ struct DoneView: View {
                 Text("Process another")
             }
             .buttonStyle(.scGhost)
+        }
+    }
+
+    // MARK: Export transcript panel
+
+    private func exportPanel(summary: DoneSummary) -> some View {
+        panel {
+            panelHeader(icon: "doc.text", title: "Export transcript")
+
+            Text(
+                appState.canExportTranscript
+                    ? "Timestamps are aligned to the final edited video."
+                    : "No transcript available for this run."
+            )
+            .font(.system(size: 13))
+            .foregroundStyle(Theme.muted)
+
+            HStack(alignment: .top, spacing: 12) {
+                exportCard(
+                    format: .aiJson,
+                    icon: "curlybraces",
+                    tint: Theme.indigo,
+                    title: "For AI (.json)",
+                    description: "Segments + word-level timings an AI can use to place overlays and b-roll.",
+                    buttonLabel: "Save JSON…",
+                    buttonStyle: .scPrimaryCompact,
+                    summary: summary
+                )
+                exportCard(
+                    format: .srt,
+                    icon: "captions.bubble",
+                    tint: Theme.teal,
+                    title: "For YouTube (.srt)",
+                    description: "Standard subtitle file you upload as a caption track in YouTube Studio.",
+                    buttonLabel: "Save SRT…",
+                    buttonStyle: .scSecondaryCompact,
+                    summary: summary
+                )
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func exportCard(
+        format: TranscriptExportFormat,
+        icon: String,
+        tint: Color,
+        title: String,
+        description: String,
+        buttonLabel: String,
+        buttonStyle: SCButtonStyle,
+        summary: DoneSummary
+    ) -> some View {
+        VStack(spacing: 12) {
+            RoundedRectangle(cornerRadius: Theme.radius, style: .continuous)
+                .fill(tint.opacity(0.16))
+                .frame(width: 38, height: 38)
+                .overlay(
+                    Image(systemName: icon)
+                        .font(.system(size: 17))
+                        .foregroundStyle(tint)
+                )
+
+            Text(title)
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(Theme.ink)
+                .multilineTextAlignment(.center)
+
+            Text(description)
+                .font(.system(size: 11))
+                .foregroundStyle(Theme.muted)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+
+            Button {
+                runExport(format, summary: summary)
+            } label: {
+                Text(buttonLabel).frame(maxWidth: .infinity)
+            }
+            .buttonStyle(buttonStyle)
+            .disabled(!appState.canExportTranscript)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(16)
+        .background(
+            RoundedRectangle(cornerRadius: Theme.radius, style: .continuous)
+                .fill(Theme.elevated)
+                .overlay(
+                    RoundedRectangle(cornerRadius: Theme.radius, style: .continuous)
+                        .stroke(Theme.borderStrong, lineWidth: 1)
+                )
+        )
+    }
+
+    /// Prompt for a destination, then export the transcript and reveal it.
+    private func runExport(_ format: TranscriptExportFormat, summary: DoneSummary) {
+        let savePanel = NSSavePanel()
+        let stem = summary.outputPath.deletingPathExtension().lastPathComponent
+        savePanel.nameFieldStringValue = "\(stem).\(format.fileExtension)"
+        savePanel.directoryURL = summary.outputPath.deletingLastPathComponent()
+        if let type = UTType(filenameExtension: format.fileExtension) {
+            savePanel.allowedContentTypes = [type]
+        }
+        guard savePanel.runModal() == .OK, let url = savePanel.url else { return }
+
+        Task {
+            if let written = await appState.exportTranscript(format: format, to: url) {
+                NSWorkspace.shared.activateFileViewerSelecting([written])
+            }
         }
     }
 }

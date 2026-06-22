@@ -22,6 +22,7 @@ import {
   transcribeFromAudio,
 } from "../retake/transcribe.js";
 import { summarize } from "../segments.js";
+import { writeTranscriptExport } from "../transcript-export/index.js";
 import type { Segment, SmartcutConfig, Token } from "../types.js";
 import {
   assertFfmpegAvailable,
@@ -526,6 +527,52 @@ export async function* runSmartcut(
   }
 
   const summary = summarize(keep, duration);
+
+  // -------------------------------------------------------------------------
+  // Transcript export (final edited timeline). Best-effort and non-fatal: a
+  // failed export must never abort a completed cut. Skipped when no transcript
+  // is available (e.g. a --plan re-render that never transcribed).
+  // -------------------------------------------------------------------------
+  if (config.exportSrtPath || config.exportAiJsonPath) {
+    if (reviewTokens.length === 0) {
+      yield {
+        type: "progress",
+        stage: "review",
+        note: "Transcript export skipped: no transcript available for this run.",
+      };
+    } else {
+      const transcript = toTranscriptTokens(reviewTokens);
+      const exports: Array<{ path: string; format: "srt" | "ai-json" }> = [];
+      if (config.exportSrtPath)
+        exports.push({ path: config.exportSrtPath, format: "srt" });
+      if (config.exportAiJsonPath)
+        exports.push({ path: config.exportAiJsonPath, format: "ai-json" });
+
+      for (const { path, format } of exports) {
+        try {
+          await writeTranscriptExport(
+            path,
+            format,
+            transcript,
+            finalPlan,
+            config.leadInMs,
+            config.tailOutMs,
+          );
+          yield {
+            type: "progress",
+            stage: "review",
+            note: `Transcript (${format === "srt" ? "SRT" : "AI JSON"}) written to ${path}`,
+          };
+        } catch (err) {
+          yield {
+            type: "progress",
+            stage: "review",
+            note: `Could not write transcript export: ${(err as Error).message}`,
+          };
+        }
+      }
+    }
+  }
 
   // -------------------------------------------------------------------------
   // Dry-run: skip render and emit `done`.

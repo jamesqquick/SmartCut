@@ -1,0 +1,690 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SmartCut — Transcript Export Mockup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  /* ============================================================
+     Design tokens — lifted verbatim from docs/ui-mockup.html so the
+     export feature reads as native SmartCut surface.
+     ============================================================ */
+  :root {
+    --font-sans: "Manrope", "Inter", ui-sans-serif, -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+    --font-mono: "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+
+    --text-hero: 56px;     --tracking-hero: -1.68px;     --leading-hero: 1.03;
+    --text-display: 40px;  --tracking-display: -1.2px;   --leading-display: 1.07;
+    --text-heading-lg: 32px; --tracking-heading-lg: -0.68px; --leading-heading-lg: 1.15;
+    --text-heading: 24px;  --tracking-heading: -0.52px;  --leading-heading: 1.2;
+    --text-heading-sm: 20px; --tracking-heading-sm: -0.2px; --leading-heading-sm: 1.25;
+    --text-subheading: 18px; --tracking-subheading: -0.18px; --leading-subheading: 1.3;
+    --text-body: 15px;     --leading-body: 1.5;
+    --text-body-sm: 13px;  --leading-body-sm: 1.43;
+    --text-caption: 11px;  --tracking-caption: 0.12em;   --leading-caption: 1.33;
+
+    --radius: 6px;
+    --radius-pill: 9999px;
+
+    --sp-4: 4px;  --sp-8: 8px;  --sp-12: 12px; --sp-16: 16px;
+    --sp-20: 20px; --sp-24: 24px; --sp-32: 32px; --sp-40: 40px;
+
+    --iris: #5848f2;
+    --iris-hover: #6d5dff;
+    --lumen: #9aa0ff;
+    --teal: #19c8d6;
+    --teal-soft: #5fe0e8;
+
+    --shadow-float: rgba(50, 50, 93, 0.12) 0px 16px 32px 0px;
+  }
+
+  :root[data-theme="light"] {
+    --canvas: #e5edf5;
+    --card: #f8fafd;
+    --elevated: #ffffff;
+    --wash: #e2e4ff;
+
+    --ink: #061b31;
+    --body: #50617a;
+    --muted: #64748d;
+    --tertiary: #7d8ba4;
+
+    --border: #d7e0eb;
+    --border-strong: #c2cedd;
+
+    --accent: var(--iris);
+    --accent-text: #ffffff;
+    --accent-wash: var(--wash);
+
+    --good: #5c9a12;
+    --good-wash: rgba(129, 184, 26, 0.14);
+    --danger: #d23b2f;
+    --danger-wash: rgba(210, 59, 47, 0.10);
+    --danger-text: #b4322a;
+    --warn: #b8860b;
+
+    --grad-title: linear-gradient(96deg, var(--iris) 0%, var(--teal) 100%);
+    --halo: radial-gradient(120% 120% at 100% 0%, rgba(88,72,242,0.42) 0%, rgba(25,200,214,0.24) 34%, rgba(229,237,245,0) 68%);
+  }
+
+  :root[data-theme="dark"] {
+    --canvas: #0a0e1a;
+    --card: #121826;
+    --elevated: #1a2233;
+    --wash: rgba(83, 58, 253, 0.16);
+
+    --ink: #f0f3f9;
+    --body: #aab6c8;
+    --muted: #7d8ba4;
+    --tertiary: #64748d;
+
+    --border: rgba(255, 255, 255, 0.08);
+    --border-strong: rgba(255, 255, 255, 0.16);
+
+    --accent: var(--iris);
+    --accent-text: #ffffff;
+    --accent-wash: rgba(83, 58, 253, 0.18);
+
+    --good: #9ad13a;
+    --good-wash: rgba(129, 184, 26, 0.14);
+    --danger: #ff6b60;
+    --danger-wash: rgba(255, 69, 58, 0.12);
+    --danger-text: #ff8a80;
+    --warn: #ffcf5e;
+
+    --grad-title: linear-gradient(96deg, var(--lumen) 0%, var(--teal-soft) 100%);
+    --halo: radial-gradient(120% 120% at 100% 0%, rgba(88,72,242,0.40) 0%, rgba(25,200,214,0.20) 36%, rgba(10,14,26,0) 72%);
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    background:
+      radial-gradient(60% 50% at 50% 0%, rgba(88,72,242,0.06), transparent 70%),
+      var(--page-bg, #06080f);
+    color: var(--ink);
+    font: 400 var(--text-body)/var(--leading-body) var(--font-sans);
+    font-feature-settings: "ss01" on, "tnum" on;
+    -webkit-font-smoothing: antialiased;
+    min-height: 100vh;
+  }
+  :root[data-theme="light"] body { --page-bg: #cdd9e6; }
+
+  /* ---------------- Top controls ---------------- */
+  .toolbar {
+    max-width: 1080px;
+    margin: 32px auto 16px;
+    padding: 0 24px;
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  .toolbar-label {
+    color: var(--muted);
+    font-size: var(--text-caption);
+    text-transform: uppercase;
+    letter-spacing: var(--tracking-caption);
+    margin-right: 4px;
+  }
+  .seg {
+    display: inline-flex;
+    background: rgba(127, 139, 164, 0.14);
+    border-radius: var(--radius);
+    padding: 3px;
+    gap: 2px;
+  }
+  .toolbar button {
+    background: transparent;
+    color: var(--body);
+    border: none;
+    border-radius: var(--radius);
+    padding: 6px 12px;
+    cursor: pointer;
+    font: 400 var(--text-body-sm)/1 var(--font-sans);
+    transition: background 0.15s, color 0.15s;
+  }
+  .toolbar button:hover { color: var(--ink); }
+  .toolbar button.active {
+    background: var(--accent);
+    color: var(--accent-text);
+  }
+  .toolbar .spacer { flex: 1; }
+
+  /* ---------------- Window chrome ---------------- */
+  .window {
+    max-width: 1080px;
+    height: 760px;
+    margin: 0 auto 24px;
+    background: var(--canvas);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    box-shadow: rgba(0, 0, 0, 0.35) 0px 24px 64px -12px;
+    display: grid;
+    grid-template-rows: 40px 1fr;
+  }
+  .titlebar {
+    background: var(--elevated);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    padding: 0 14px;
+    position: relative;
+  }
+  .traffic { display: flex; gap: 8px; }
+  .traffic span {
+    width: 12px; height: 12px;
+    border-radius: var(--radius-pill);
+    display: block;
+  }
+  .traffic .r { background: #ff5f57; }
+  .traffic .y { background: #febc2e; }
+  .traffic .g { background: #28c840; }
+  .title {
+    position: absolute; left: 0; right: 0;
+    text-align: center;
+    color: var(--muted);
+    font-weight: 400;
+    font-size: var(--text-body-sm);
+    letter-spacing: -0.1px;
+    pointer-events: none;
+  }
+
+  /* ---------------- Layout ---------------- */
+  .screen { display: grid; grid-template-columns: 248px 1fr; height: 100%; }
+
+  aside {
+    background: var(--card);
+    border-right: 1px solid var(--border);
+    padding: 20px 16px;
+    overflow-y: auto;
+  }
+  aside h3 {
+    margin: 0 0 12px;
+    font-size: var(--text-caption);
+    font-weight: 400;
+    text-transform: uppercase;
+    color: var(--muted);
+    letter-spacing: var(--tracking-caption);
+  }
+  aside h3.spaced { margin-top: 28px; }
+
+  .step {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    padding: 8px 10px;
+    border-radius: var(--radius);
+    margin-bottom: 2px;
+  }
+  .step .dot {
+    width: 9px; height: 9px;
+    border-radius: var(--radius-pill);
+    background: var(--border-strong);
+    flex-shrink: 0;
+  }
+  .step.done .dot { background: var(--good); }
+  .step .label { flex: 1; font-size: var(--text-body-sm); color: var(--ink); }
+  .step:not(.done) .label { color: var(--muted); }
+  .step .label .meta { color: var(--muted); font-size: var(--text-caption); margin-top: 2px; }
+
+  .side-block {
+    color: var(--body);
+    font-size: var(--text-body-sm);
+    line-height: 1.95;
+  }
+  .side-block strong { color: var(--ink); font-weight: 500; }
+
+  /* ---------------- Content area ---------------- */
+  section.content {
+    padding: 28px 36px;
+    overflow-y: auto;
+    position: relative;
+  }
+  .halo {
+    position: absolute;
+    inset: 0;
+    background: var(--halo);
+    pointer-events: none;
+    z-index: 0;
+  }
+  .content > .stack { position: relative; z-index: 1; }
+
+  /* ---------------- Buttons ---------------- */
+  .btn {
+    padding: 9px 16px;
+    border-radius: var(--radius);
+    border: 1px solid var(--border-strong);
+    background: var(--elevated);
+    color: var(--ink);
+    cursor: pointer;
+    font: 400 var(--text-body-sm)/1 var(--font-sans);
+    transition: background 0.15s, border-color 0.15s, color 0.15s;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .btn:hover { background: var(--wash); }
+  .btn.primary {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--accent-text);
+  }
+  .btn.primary:hover { background: var(--iris-hover); }
+  .btn.secondary {
+    background: transparent;
+    border-color: var(--ink);
+    color: var(--ink);
+  }
+  .btn.secondary:hover { background: var(--ink); color: var(--canvas); }
+  .btn.ghost { background: transparent; border-color: transparent; color: var(--body); }
+  .btn.ghost:hover { background: var(--wash); color: var(--ink); }
+  .btn[disabled] { opacity: 0.45; cursor: not-allowed; }
+  .btn .arrow { font-size: 11px; opacity: 0.8; }
+  .button-row { display: flex; gap: 10px; flex-wrap: wrap; }
+
+  svg.ic { width: 1em; height: 1em; stroke: currentColor; fill: none; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+
+  /* ---------------- Done card ---------------- */
+  .done-card {
+    background: var(--elevated);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 30px 32px;
+    text-align: center;
+    box-shadow: var(--shadow-float);
+  }
+  .done-card .check {
+    width: 56px; height: 56px;
+    background: var(--accent-wash);
+    border-radius: var(--radius-pill);
+    display: grid; place-items: center;
+    margin: 0 auto 18px;
+    color: var(--accent);
+  }
+  .done-card h2 {
+    font-size: var(--text-heading);
+    font-weight: 300;
+    letter-spacing: var(--tracking-heading);
+    margin: 0 0 6px;
+    background: var(--grad-title);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    width: fit-content; margin-inline: auto;
+  }
+  .done-card .sub { color: var(--muted); font-size: var(--text-body-sm); }
+  .done-card .sub code, code {
+    font-family: var(--font-mono);
+    font-size: 0.9em;
+    background: var(--wash);
+    color: var(--ink);
+    padding: 1px 5px;
+    border-radius: var(--radius);
+  }
+  .summary-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin: 0 0 8px;
+    text-align: left;
+  }
+  .summary-tile {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+  }
+  .summary-tile .label {
+    color: var(--muted);
+    font-size: var(--text-caption);
+    text-transform: uppercase;
+    letter-spacing: var(--tracking-caption);
+    margin-bottom: 6px;
+  }
+  .summary-tile .value { font-size: var(--text-subheading); font-weight: 400; color: var(--ink); font-variant-numeric: tabular-nums; }
+  .summary-tile .value.good { color: var(--good); }
+  .detail-line { color: var(--muted); font-size: var(--text-body-sm); margin: 8px 0 0; }
+
+  /* ---------------- Reusable panel (Video details + Export transcript) ---------------- */
+  .panel {
+    margin: 16px 0 0;
+    padding: 20px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    text-align: left;
+  }
+  .panel-head {
+    display: flex; align-items: center; gap: 8px;
+    margin-bottom: 14px;
+  }
+  .panel-head .ic { color: var(--accent); font-size: 16px; }
+  .panel-head h3 {
+    margin: 0;
+    font-size: var(--text-body);
+    font-weight: 500;
+    color: var(--ink);
+  }
+  .panel .hint { color: var(--muted); font-size: var(--text-body-sm); margin: 0 0 16px; }
+
+  .export-options { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .export-card {
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius);
+    background: var(--elevated);
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .export-card .ec-top { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 10px; }
+  .export-card .ec-icon {
+    width: 38px; height: 38px;
+    border-radius: var(--radius);
+    background: var(--accent-wash);
+    color: var(--accent);
+    display: grid; place-items: center;
+    flex-shrink: 0;
+    font-size: 18px;
+  }
+  .export-card .ec-icon.teal { color: var(--teal); background: rgba(25,200,214,0.14); }
+  .export-card .ec-title { font-size: var(--text-body-sm); font-weight: 500; color: var(--ink); }
+  .export-card .ec-desc { font-size: var(--text-caption); line-height: 1.5; color: var(--muted); margin-top: 3px; letter-spacing: 0; text-transform: none; }
+  .export-card .btn { justify-content: center; }
+  .export-card.is-exported { border-color: var(--good); }
+  .ec-status { display: none; align-items: center; gap: 6px; font-size: var(--text-caption); color: var(--good); }
+  .ec-status .ic { font-size: 13px; }
+  .export-card.is-exported .ec-status { display: inline-flex; }
+  .export-card.is-exported .ec-action { display: none; }
+
+  /* ---------------- Format preview panels ---------------- */
+  .preview-wrap { margin-top: 22px; }
+  .preview-tabs {
+    display: inline-flex;
+    background: rgba(127, 139, 164, 0.14);
+    border-radius: var(--radius);
+    padding: 3px; gap: 2px;
+    margin-bottom: 12px;
+  }
+  .preview-tabs button {
+    background: transparent; color: var(--body);
+    border: none; border-radius: var(--radius);
+    padding: 6px 14px; cursor: pointer;
+    font: 400 var(--text-body-sm)/1 var(--font-sans);
+  }
+  .preview-tabs button.active { background: var(--accent); color: var(--accent-text); }
+
+  .code-panel {
+    background: var(--elevated);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+  .code-panel header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    background: var(--card);
+  }
+  .code-panel header .fname { font-family: var(--font-mono); font-size: var(--text-body-sm); color: var(--ink); }
+  .code-panel header .tag {
+    font-size: var(--text-caption); text-transform: uppercase; letter-spacing: var(--tracking-caption);
+    color: var(--muted);
+  }
+  .code-panel pre {
+    margin: 0;
+    padding: 16px 18px;
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    line-height: 1.7;
+    color: var(--body);
+    overflow-x: auto;
+    max-height: 280px;
+  }
+  .code-panel pre .k { color: var(--lumen); }
+  :root[data-theme="light"] .code-panel pre .k { color: var(--iris); }
+  .code-panel pre .s { color: var(--teal); }
+  :root[data-theme="light"] .code-panel pre .s { color: #0f8a94; }
+  .code-panel pre .n { color: var(--warn); }
+  .code-panel pre .c { color: var(--tertiary); }
+  .code-panel pre .ts { color: var(--good); }
+  .preview-pane { display: none; }
+  .preview-pane.active { display: block; }
+  .preview-note { color: var(--tertiary); font-size: var(--text-caption); margin: 10px 2px 0; line-height: 1.5; }
+
+  .footnote { color: var(--tertiary); font-size: var(--text-caption); margin: 0 0 40px; text-align: center; }
+</style>
+</head>
+<body>
+
+<div class="toolbar">
+  <span class="toolbar-label">Transcript Export · Done screen</span>
+  <span class="spacer"></span>
+  <span class="toolbar-label">State</span>
+  <div class="seg" id="state-seg">
+    <button data-state="ready" class="active">Ready</button>
+    <button data-state="exported">After SRT export</button>
+    <button data-state="empty">No transcript</button>
+  </div>
+  <span class="toolbar-label" style="margin-left:8px;">Theme</span>
+  <div class="seg" id="theme-seg">
+    <button data-theme-btn="light">Light</button>
+    <button data-theme-btn="dark" class="active">Dark</button>
+  </div>
+</div>
+
+<div class="window">
+  <div class="titlebar">
+    <div class="traffic"><span class="r"></span><span class="y"></span><span class="g"></span></div>
+    <div class="title">SmartCut — interview.mp4 — Done</div>
+    <div style="width:60px"></div>
+  </div>
+
+  <main class="screen">
+    <aside>
+      <h3>Pipeline</h3>
+      <div class="step done"><div class="dot"></div><div class="label">File loaded</div></div>
+      <div class="step done"><div class="dot"></div><div class="label">Audio extracted</div></div>
+      <div class="step done"><div class="dot"></div><div class="label">Silence detected</div></div>
+      <div class="step done"><div class="dot"></div><div class="label">Transcribed<div class="meta">1,842 words</div></div></div>
+      <div class="step done"><div class="dot"></div><div class="label">Retakes detected</div></div>
+      <div class="step done"><div class="dot"></div><div class="label">Review complete</div></div>
+      <div class="step done"><div class="dot"></div><div class="label">Rendered<div class="meta">52s</div></div></div>
+
+      <h3 class="spaced">Session</h3>
+      <div class="side-block">
+        <strong>Output:</strong> interview-smart.mp4<br>
+        <strong>Total time:</strong> 1m 47s<br>
+        <strong>Silence cuts:</strong> 47<br>
+        <strong>Retake cuts:</strong> 9<br>
+        <strong>Retakes kept:</strong> 3
+      </div>
+    </aside>
+
+    <section class="content">
+      <div class="halo"></div>
+      <div class="stack" style="width: 100%; max-width: 600px; margin: 0 auto;">
+        <div class="done-card">
+          <div class="check">
+            <svg class="ic" style="font-size:26px; stroke-width:2" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+          </div>
+          <h2>Smart cut complete</h2>
+
+          <!-- =================== Video =================== -->
+          <div class="panel">
+            <div class="panel-head">
+              <svg class="ic" viewBox="0 0 24 24"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
+              <h3>Video</h3>
+            </div>
+            <div class="sub" style="margin-bottom: 14px;">Saved to <code>~/Desktop/interview-smart.mp4</code></div>
+
+            <div class="summary-grid">
+              <div class="summary-tile"><div class="label">Original</div><div class="value">12:34</div></div>
+              <div class="summary-tile"><div class="label">Final</div><div class="value">10:20</div></div>
+              <div class="summary-tile"><div class="label">Saved</div><div class="value good">2:14 (17.8%)</div></div>
+            </div>
+            <p class="detail-line">47 silence regions removed · 9 retakes cut · 3 kept</p>
+
+            <div class="button-row" style="margin-top: 16px;">
+              <button class="btn primary">Reveal video<span class="arrow">→</span></button>
+              <button class="btn secondary">Open</button>
+              <button class="btn ghost">Process another</button>
+            </div>
+          </div>
+
+          <!-- =================== NEW: Export transcript =================== -->
+          <div class="panel" id="export-block">
+            <div class="panel-head">
+              <svg class="ic" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="13" y2="17"/></svg>
+              <h3>Export transcript</h3>
+            </div>
+            <p class="hint" id="export-hint">Timestamps are aligned to the final edited video.</p>
+
+            <div class="export-options">
+              <!-- Editing JSON -->
+              <div class="export-card" data-format="json">
+                <div class="ec-top">
+                  <div class="ec-icon">
+                    <svg class="ic" style="font-size:18px" viewBox="0 0 24 24"><path d="M8 3H7a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2 2 2 0 0 1 2 2v4a2 2 0 0 0 2 2h1"/><path d="M16 3h1a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2 2 2 0 0 0-2 2v4a2 2 0 0 1-2 2h-1"/></svg>
+                  </div>
+                  <div>
+                    <div class="ec-title">For AI (.json)</div>
+                    <div class="ec-desc">Segments + word-level timings an AI can use to place overlays and b-roll.</div>
+                  </div>
+                </div>
+                <button class="btn primary ec-action">Save JSON…</button>
+                <span class="ec-status"><svg class="ic" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg> Saved · Reveal in Finder</span>
+              </div>
+
+              <!-- YouTube SRT -->
+              <div class="export-card" data-format="srt">
+                <div class="ec-top">
+                  <div class="ec-icon teal">
+                    <svg class="ic" style="font-size:18px" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="6" y1="15" x2="11" y2="15"/><line x1="14" y1="15" x2="18" y2="15"/></svg>
+                  </div>
+                  <div>
+                    <div class="ec-title">For YouTube (.srt)</div>
+                    <div class="ec-desc">Standard subtitle file you upload as a caption track in YouTube Studio.</div>
+                  </div>
+                </div>
+                <button class="btn secondary ec-action">Save SRT…</button>
+                <span class="ec-status"><svg class="ic" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg> Saved · Reveal in Finder</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- =================== Output format previews =================== -->
+        <div class="preview-wrap">
+          <div class="preview-tabs" id="preview-tabs">
+            <button data-pane="json" class="active">AI JSON output</button>
+            <button data-pane="srt">YouTube SRT output</button>
+          </div>
+
+          <div class="preview-pane active" data-pane="json">
+            <div class="code-panel">
+              <header><span class="fname">interview-smart.editing.json</span><span class="tag">final timeline</span></header>
+<pre><span class="c">// segments give the AI clean anchors; words give sub-second in/out points</span>
+{
+  <span class="k">"source"</span>: <span class="s">"interview.mp4"</span>,
+  <span class="k">"timeline"</span>: <span class="s">"edited"</span>,
+  <span class="k">"duration"</span>: <span class="n">620.4</span>,
+  <span class="k">"segments"</span>: [
+    { <span class="k">"id"</span>: <span class="n">0</span>, <span class="k">"start"</span>: <span class="ts">0.0</span>,  <span class="k">"end"</span>: <span class="ts">4.21</span>, <span class="k">"text"</span>: <span class="s">"So today we're wiring up the deploy step."</span> },
+    { <span class="k">"id"</span>: <span class="n">1</span>, <span class="k">"start"</span>: <span class="ts">4.21</span>, <span class="k">"end"</span>: <span class="ts">9.84</span>, <span class="k">"text"</span>: <span class="s">"The way you configure this is by editing wrangler.jsonc."</span> }
+  ],
+  <span class="k">"words"</span>: [
+    { <span class="k">"word"</span>: <span class="s">"So"</span>,    <span class="k">"start"</span>: <span class="ts">0.0</span>,  <span class="k">"end"</span>: <span class="ts">0.18</span> },
+    { <span class="k">"word"</span>: <span class="s">"today"</span>, <span class="k">"start"</span>: <span class="ts">0.18</span>, <span class="k">"end"</span>: <span class="ts">0.52</span> },
+    { <span class="k">"word"</span>: <span class="s">"we're"</span>, <span class="k">"start"</span>: <span class="ts">0.52</span>, <span class="k">"end"</span>: <span class="ts">0.80</span> }
+  ]
+}</pre>
+            </div>
+            <p class="preview-note">Cut regions are dropped and gaps collapsed, so every timestamp maps directly onto the rendered file an editor or AI will work against.</p>
+          </div>
+
+          <div class="preview-pane" data-pane="srt">
+            <div class="code-panel">
+              <header><span class="fname">interview-smart.srt</span><span class="tag">final timeline</span></header>
+<pre><span class="n">1</span>
+<span class="ts">00:00:00,000 --> 00:00:04,210</span>
+So today we're wiring up the deploy step.
+
+<span class="n">2</span>
+<span class="ts">00:00:04,210 --> 00:00:09,840</span>
+The way you configure this is by
+editing wrangler.jsonc.
+
+<span class="n">3</span>
+<span class="ts">00:00:09,840 --> 00:00:13,470</span>
+Once that's saved, the pipeline picks
+it up automatically.</pre>
+            </div>
+            <p class="preview-note">Words are chunked into 1–2 line cues on sentence ends and pauses (~42 chars/line, max ~5s/cue) — uploads straight into YouTube Studio.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<p class="footnote">SmartCut · transcript export mockup · two explicit buttons on the Done screen · toggle states + theme above</p>
+
+<script>
+  // Theme switching
+  const themeButtons = document.querySelectorAll('#theme-seg button');
+  themeButtons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.documentElement.setAttribute('data-theme', btn.dataset.themeBtn);
+      themeButtons.forEach(b => b.classList.toggle('active', b === btn));
+    });
+  });
+  if (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) {
+    document.querySelector('[data-theme-btn="light"]').click();
+  }
+
+  // Output preview tabs
+  const tabs = document.querySelectorAll('#preview-tabs button');
+  const panes = document.querySelectorAll('.preview-pane');
+  tabs.forEach(btn => {
+    btn.addEventListener('click', () => {
+      tabs.forEach(b => b.classList.toggle('active', b === btn));
+      panes.forEach(p => p.classList.toggle('active', p.dataset.pane === btn.dataset.pane));
+    });
+  });
+
+  // State switching: ready / exported / empty
+  const stateButtons = document.querySelectorAll('#state-seg button');
+  const srtCard = document.querySelector('.export-card[data-format="srt"]');
+  const jsonCard = document.querySelector('.export-card[data-format="json"]');
+  const hint = document.getElementById('export-hint');
+  const actions = document.querySelectorAll('.export-card .ec-action');
+
+  function applyState(state) {
+    srtCard.classList.remove('is-exported');
+    jsonCard.classList.remove('is-exported');
+    actions.forEach(b => b.removeAttribute('disabled'));
+    hint.textContent = 'Timestamps are aligned to the final edited video.';
+
+    if (state === 'exported') {
+      srtCard.classList.add('is-exported');
+    } else if (state === 'empty') {
+      actions.forEach(b => b.setAttribute('disabled', ''));
+      hint.textContent = 'No transcript available — transcription was skipped for this run.';
+    }
+  }
+  stateButtons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      stateButtons.forEach(b => b.classList.toggle('active', b === btn));
+      applyState(btn.dataset.state);
+    });
+  });
+</script>
+
+</body>
+</html>

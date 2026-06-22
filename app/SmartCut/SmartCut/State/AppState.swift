@@ -637,6 +637,22 @@ final class AppState {
         resetToDrop()
     }
 
+    /// True once a finished run has a transcript available to export.
+    var canExportTranscript: Bool { engine?.canExportTranscript == true }
+
+    /// Re-transcribe the final rendered video and write the transcript to `url`.
+    /// Returns the written URL on success; sets `errorMessage` and returns nil on failure.
+    func exportTranscript(format: TranscriptExportFormat, to url: URL) async -> URL? {
+        do {
+            try await engine.exportTranscript(format: format, to: url)
+            appendLog(.ok, "Transcript (\(format.rawValue)) exported → \(url.path)")
+            return url
+        } catch {
+            errorMessage = error.localizedDescription
+            return nil
+        }
+    }
+
     func resetToDrop() {
         screen = .drop
         droppedFile = nil

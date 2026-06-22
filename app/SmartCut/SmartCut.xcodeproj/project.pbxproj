@@ -19,7 +19,7 @@
 		2FC4F33DC7145CBDD78B68C3 /* PipelineRunningView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CFF86949977C08C95E4A47D8 /* PipelineRunningView.swift */; };
 		3F84C676F28DDAC8D65292E9 /* FirstRunSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3AD1DEEEFF2A71922099C7D /* FirstRunSheet.swift */; };
 		4831C3D280BA7166931C5D6B /* AudioPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = B70F61A13E399EBFDE6248ED /* AudioPlayer.swift */; };
-		D27455C699E74EE98AF8CF6E /* VideoPreviewPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5007F3C2BC834FD3B0CB6BC1 /* VideoPreviewPlayer.swift */; };
+		4A220BDFC2348BBEEAD11AB5 /* TranscriptFormatter.swift in Sources */ = {isa = PBXBuildFile; fileRef = E079267B0369C51CF9427891 /* TranscriptFormatter.swift */; };
 		5BBD9C3F9AC8638DB338B5A9 /* TranscriptReviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9DD8AEB2C0206F691FB80CC6 /* TranscriptReviewView.swift */; };
 		5D55B5CA307CD546F9006D8A /* Whisper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36884DA2E674A8B042A96C81 /* Whisper.swift */; };
 		5F298894914D2EE8B2586965 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 9E18683F0A838AC7A41E2670 /* Assets.xcassets */; };
@@ -35,11 +35,11 @@
 		92753C184532C8BF4B87D845 /* CredentialsSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2C4B20D4F2FED1E6C423B9D /* CredentialsSettingsView.swift */; };
 		9974F4C13EFE9E7BD5104F7E /* Ffmpeg.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0259F83B4FD4E5319FE9A2E /* Ffmpeg.swift */; };
 		9AA54DEBA4C529C32F3E9811 /* EngineError.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C7F6D27E00E0D3F05D105CA /* EngineError.swift */; };
-		9F284730B700FA70BF170406 /* RetakeCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C368E6771004B5B50DE5ECF0 /* RetakeCardView.swift */; };
 		9FD82A26DA6DC05384EAFE73 /* RetakePlanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 590DDD4968DC7136EC208389 /* RetakePlanner.swift */; };
 		A4AFAE38F0493B1A27EA23CA /* SettingsWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 377CEA847919A03DC02D4FF7 /* SettingsWindow.swift */; };
 		AA5130B2773C74AF4AA8E453 /* PipelineTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D217934B98A063A15DAF4A9 /* PipelineTypes.swift */; };
 		AA5C3A9B53AAD38EF844A88A /* RetakeDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC11176BBE4258D08C60EF0F /* RetakeDetector.swift */; };
+		AE81EDE728FF0888D1C4454A /* VideoPreviewPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94C11540F83382384D509BE5 /* VideoPreviewPlayer.swift */; };
 		AFF648C1C5833923272F08C4 /* Snap.swift in Sources */ = {isa = PBXBuildFile; fileRef = 09E66F5C0951D6DFB01AC785 /* Snap.swift */; };
 		B409E4DCBD357AD0DB6295DA /* CredentialFields.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4DF7EF58D39CC636304891DD /* CredentialFields.swift */; };
 		BA9D2D3DFF1741D10187A05A /* TranscriptText.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6BD9FAB72BC1EEA0A7502F04 /* TranscriptText.swift */; };
@@ -82,9 +82,9 @@
 		7B6CF720533A461BA05151AE /* Token.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Token.swift; sourceTree = "<group>"; };
 		8273AD259A97AAB07980C965 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
 		8772A3944453991B0DEE70B8 /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
-		8BC05C466C65A6998A026B85 /* RetakeReviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RetakeReviewView.swift; sourceTree = "<group>"; };
 		8D6EC81F8F8579D3E0A9B6B0 /* Transcribe.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Transcribe.swift; sourceTree = "<group>"; };
 		923928AF71D086CFB3231CE2 /* ReviewBatch.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReviewBatch.swift; sourceTree = "<group>"; };
+		94C11540F83382384D509BE5 /* VideoPreviewPlayer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoPreviewPlayer.swift; sourceTree = "<group>"; };
 		97A0D0409C8BCE04CDE84669 /* GatewayClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GatewayClient.swift; sourceTree = "<group>"; };
 		9BC8E715862A37E237E77C71 /* EditPlan.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditPlan.swift; sourceTree = "<group>"; };
 		9DD8AEB2C0206F691FB80CC6 /* TranscriptReviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptReviewView.swift; sourceTree = "<group>"; };
@@ -93,13 +93,13 @@
 		A3AD1DEEEFF2A71922099C7D /* FirstRunSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FirstRunSheet.swift; sourceTree = "<group>"; };
 		B47C967E3544951CD30DE48C /* RenderProgressView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RenderProgressView.swift; sourceTree = "<group>"; };
 		B70F61A13E399EBFDE6248ED /* AudioPlayer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioPlayer.swift; sourceTree = "<group>"; };
-		5007F3C2BC834FD3B0CB6BC1 /* VideoPreviewPlayer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoPreviewPlayer.swift; sourceTree = "<group>"; };
 		C86C4064CAD8EF29767A6300 /* DoneView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DoneView.swift; sourceTree = "<group>"; };
 		CC11176BBE4258D08C60EF0F /* RetakeDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RetakeDetector.swift; sourceTree = "<group>"; };
 		CFF86949977C08C95E4A47D8 /* PipelineRunningView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PipelineRunningView.swift; sourceTree = "<group>"; };
 		D0259F83B4FD4E5319FE9A2E /* Ffmpeg.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Ffmpeg.swift; sourceTree = "<group>"; };
 		D49AB073F6882145C85E6FC5 /* RetakeSchema.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RetakeSchema.swift; sourceTree = "<group>"; };
 		D4C1F56CACF123D035D87885 /* DropZoneView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DropZoneView.swift; sourceTree = "<group>"; };
+		E079267B0369C51CF9427891 /* TranscriptFormatter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptFormatter.swift; sourceTree = "<group>"; };
 		E915790035615ADA9D8CAF25 /* AppConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppConfig.swift; sourceTree = "<group>"; };
 		F097AD5F5162BC3FD14F7C6F /* Ffprobe.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Ffprobe.swift; sourceTree = "<group>"; };
 		F7B0C2380ACB6E122C162305 /* CheckForUpdatesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CheckForUpdatesView.swift; sourceTree = "<group>"; };
@@ -190,6 +190,7 @@
 				0B56AF72C021601D58CE4308 /* ProcessRunner.swift */,
 				923928AF71D086CFB3231CE2 /* ReviewBatch.swift */,
 				8D6EC81F8F8579D3E0A9B6B0 /* Transcribe.swift */,
+				E079267B0369C51CF9427891 /* TranscriptFormatter.swift */,
 			);
 			path = Engine;
 			sourceTree = "<group>";
@@ -249,7 +250,7 @@
 				F7B0C2380ACB6E122C162305 /* CheckForUpdatesView.swift */,
 				7946DB038E18ECFB0243C6AE /* Formatters.swift */,
 				8273AD259A97AAB07980C965 /* Theme.swift */,
-				5007F3C2BC834FD3B0CB6BC1 /* VideoPreviewPlayer.swift */,
+				94C11540F83382384D509BE5 /* VideoPreviewPlayer.swift */,
 			);
 			path = Util;
 			sourceTree = "<group>";
@@ -345,7 +346,6 @@
 				E26EDA875AC956D1CE0C10B6 /* AppPreferences.swift in Sources */,
 				FEDF877023DD7B0F373BFD0A /* AppState.swift in Sources */,
 				4831C3D280BA7166931C5D6B /* AudioPlayer.swift in Sources */,
-				D27455C699E74EE98AF8CF6E /* VideoPreviewPlayer.swift in Sources */,
 				7887305DB0CCDD1F8ADF728D /* CheckForUpdatesView.swift in Sources */,
 				6A6EE02D359544A9A0A8C8FA /* ContentView.swift in Sources */,
 				B409E4DCBD357AD0DB6295DA /* CredentialFields.swift in Sources */,
@@ -372,7 +372,6 @@
 				05E8DCB1DDA4649A58AC558E /* RetakeDecision.swift in Sources */,
 				AA5C3A9B53AAD38EF844A88A /* RetakeDetector.swift in Sources */,
 				9FD82A26DA6DC05384EAFE73 /* RetakePlanner.swift in Sources */,
-				37716431DE057787469FDCF1 /* RetakeReviewView.swift in Sources */,
 				06FF95D81903186569952C38 /* RetakeSchema.swift in Sources */,
 				78FCFD69DBCD669C0AA40E67 /* ReviewBatch.swift in Sources */,
 				A4AFAE38F0493B1A27EA23CA /* SettingsWindow.swift in Sources */,
@@ -383,8 +382,10 @@
 				6584CCE7E1E8A345DC5FAD65 /* Theme.swift in Sources */,
 				06DBB0ADA6CCD80B56ADBB35 /* Token.swift in Sources */,
 				09870095123322EA448A24E0 /* Transcribe.swift in Sources */,
+				4A220BDFC2348BBEEAD11AB5 /* TranscriptFormatter.swift in Sources */,
 				5BBD9C3F9AC8638DB338B5A9 /* TranscriptReviewView.swift in Sources */,
 				BA9D2D3DFF1741D10187A05A /* TranscriptText.swift in Sources */,
+				AE81EDE728FF0888D1C4454A /* VideoPreviewPlayer.swift in Sources */,
 				5D55B5CA307CD546F9006D8A /* Whisper.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
