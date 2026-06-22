@@ -26,7 +26,6 @@ SmartCut downloads as a native macOS app, but it is **not self-contained**. The 
 | Requirement | Install | Notes |
 | ----------- | ------- | ----- |
 | **macOS 14+** (Sonoma) | — | Minimum deployment target |
-| **Node 20+** | `brew install node` | Runs the processing sidecar |
 | **ffmpeg** | `brew install ffmpeg` | Silence detection and rendering |
 | **whisper-cli** | `brew install whisper-cpp` | Local speech-to-text transcription |
 | **Cloudflare account** | [dash.cloudflare.com](https://dash.cloudflare.com) | Required for AI Gateway (see Setup below) |
@@ -34,7 +33,7 @@ SmartCut downloads as a native macOS app, but it is **not self-contained**. The 
 Install the Homebrew dependencies first:
 
 ```bash
-brew install node ffmpeg whisper-cpp
+brew install ffmpeg whisper-cpp
 ```
 
 ## Install
@@ -82,11 +81,11 @@ Credentials are saved to `~/.smartcut/config.json`. To update them later, edit t
 ## How It Works
 
 ```
-SwiftUI app  ↔  (JSON-RPC over stdio)  ↔  Node sidecar  ↔  ffmpeg + whisper-cli
-                                                          ↔  Claude via Cloudflare AI Gateway
+SwiftUI app  →  PipelineEngine (Swift)  →  ffmpeg + whisper-cli (subprocess)
+                                         →  Claude via Cloudflare AI Gateway (URLSession)
 ```
 
-The macOS app spawns a long-lived Node process (`quietcut-server`) as a child and drives it via newline-delimited JSON-RPC over stdin/stdout. Pipeline events stream back as notifications.
+The pipeline runs entirely within the Swift app. There is no Node.js process involved. `ffmpeg`, `ffprobe`, and `whisper-cli` are invoked as subprocesses via `Foundation.Process`. Claude is called directly over HTTPS using `URLSession` with Server-Sent Events streaming.
 
 ### Pipeline steps
 
@@ -137,28 +136,25 @@ pnpm --filter quietcut-cli dev smartcut path/to/video.mp4
 
 ## Building Locally
 
-**Prerequisites:** macOS 14+, Xcode 15+, Node 20+, pnpm, ffmpeg, whisper-cli, xcodegen.
+**Prerequisites:** macOS 14+, Xcode 15+, pnpm, ffmpeg, whisper-cli, xcodegen.
+
+> **Note:** Node.js is only required if you want to build or run the `quietcut-cli` terminal CLI. It is not needed to build or run the macOS app.
 
 ```bash
-# 1. Clone and install TypeScript dependencies.
+# 1. Clone the repo.
 git clone https://github.com/jamesqquick/SmartCut.git
 cd SmartCut
+
+# 2. (Optional) Install TypeScript dependencies for the CLI.
 pnpm install
 
-# 2. Copy and fill in credentials.
-cp .env.example .env
-# Edit .env — fill in CLOUDFLARE_ACCOUNT_ID and CF_AIG_TOKEN.
-
-# 3. Build the TypeScript workspace (core, CLI, sidecar).
-pnpm build
-
-# 4. Generate the Xcode project.
+# 3. Generate the Xcode project.
 cd app/SmartCut && xcodegen generate && cd ../..
 
-# 5a. Open in Xcode and click Run (⌘R):
+# 4a. Open in Xcode and click Run (⌘R):
 open app/SmartCut/SmartCut.xcodeproj
 
-# 5b. Or build from the command line:
+# 4b. Or build from the command line:
 xcodebuild -project app/SmartCut/SmartCut.xcodeproj -scheme SmartCut build
 ```
 
@@ -167,23 +163,24 @@ xcodebuild -project app/SmartCut/SmartCut.xcodeproj -scheme SmartCut build
 ```
 SmartCut/
 ├── package.json                    pnpm workspace root
-├── .env.example                    credential template
+├── .env.example                    credential template (CLI only)
 ├── scripts/
 │   ├── bump-version.sh             bump version across all files
 │   └── package-dmg.sh              build and package a DMG locally
 ├── docs/
-│   ├── architecture.md             JSON-RPC wire protocol reference
+│   ├── architecture.md             native Swift pipeline reference
 │   ├── RELEASING.md                release process and secrets guide
 │   └── PLAN.md                     implementation plan
 ├── packages/
-│   ├── quietcut-core/              pipeline library (async generator)
+│   ├── quietcut-core/              pipeline library (async generator, CLI only)
 │   ├── quietcut-cli/               terminal CLI (quietcut command)
-│   └── quietcut-server/            Node sidecar (JSON-RPC over stdio)
+│   └── quietcut-server/            legacy Node sidecar (no longer used by the app)
 └── app/
     └── SmartCut/                   Xcode project (SwiftUI, macOS)
         ├── project.yml             xcodegen source of truth
         └── SmartCut/
-            ├── Pipeline/           SidecarClient, PipelineEvent types
+            ├── Engine/             native Swift pipeline (ffmpeg, whisper, Claude)
+            ├── Pipeline/           PipelineEvent types, PipelineTypes
             ├── State/              AppState, AppConfig, AppPreferences
             ├── Views/              one SwiftUI view per screen
             └── Util/               AudioPlayer, formatters
@@ -192,12 +189,8 @@ SmartCut/
 ## Tests
 
 ```bash
-# Core library unit tests:
+# Core library unit tests (CLI):
 pnpm --filter quietcut-core test
-
-# Sidecar integration tests (requires .env + a fixture video):
-SMARTCUT_FIXTURE="$HOME/Movies/your-clip.mov" \
-  pnpm --filter quietcut-server test
 ```
 
 ## Versioning
