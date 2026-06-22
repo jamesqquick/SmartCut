@@ -38,6 +38,22 @@ struct TranscriptReviewView: View {
             audio.stop()
             video.stop()
         }
+        // ⇧←/→ and ⌥←/→ are consumed by AppKit before onKeyPress sees them.
+        // A local NSEvent monitor intercepts them first.
+        .background(
+            BoundaryKeyMonitor(
+                onNudgeStart: { delta in
+                    guard let cut = currentCut else { return }
+                    appState.adjustCutStart(cut.opId, to: cut.removeStartIndex + delta)
+                    if inspectOpen { playVideoPreview() }
+                },
+                onNudgeEnd: { delta in
+                    guard let cut = currentCut else { return }
+                    appState.adjustCutEnd(cut.opId, to: cut.removeEndIndex + delta)
+                    if inspectOpen { playVideoPreview() }
+                }
+            )
+        )
     }
 
     // MARK: - Sidebar
@@ -610,28 +626,8 @@ struct TranscriptReviewView: View {
         case .escape:
             if inspectOpen { inspectOpen = false; video.stop(); return .handled }
             return .ignored
-        // ⇧← / ⇧→  — nudge the START (beginning) of the cut
-        case .leftArrow where press.modifiers == .shift:
-            guard let cut = currentCut else { return .ignored }
-            appState.adjustCutStart(cut.opId, to: cut.removeStartIndex - 1)
-            if inspectOpen { playVideoPreview() }
-            return .handled
-        case .rightArrow where press.modifiers == .shift:
-            guard let cut = currentCut else { return .ignored }
-            appState.adjustCutStart(cut.opId, to: cut.removeStartIndex + 1)
-            if inspectOpen { playVideoPreview() }
-            return .handled
-        // ⌥← / ⌥→  — nudge the END of the cut
-        case .leftArrow where press.modifiers == .option:
-            guard let cut = currentCut else { return .ignored }
-            appState.adjustCutEnd(cut.opId, to: cut.removeEndIndex - 1)
-            if inspectOpen { playVideoPreview() }
-            return .handled
-        case .rightArrow where press.modifiers == .option:
-            guard let cut = currentCut else { return .ignored }
-            appState.adjustCutEnd(cut.opId, to: cut.removeEndIndex + 1)
-            if inspectOpen { playVideoPreview() }
-            return .handled
+        // ⇧←/→ and ⌥←/→ are handled by BoundaryKeyMonitor (NSEvent level),
+        // not here, because AppKit consumes modified arrows before onKeyPress.
         default:
             return .ignored
         }
@@ -708,6 +704,69 @@ struct WordFlowLayout: Layout {
             if x + s.width > maxWidth && x > 0 { x = 0; y += lh + lineSpacing; lh = 0 }
             sv.place(at: CGPoint(x: bounds.minX + x, y: bounds.minY + y), proposal: ProposedViewSize(s))
             x += s.width + spacing; lh = max(lh, s.height)
+        }
+    }
+}
+
+// MARK: - Boundary key monitor
+
+/// Intercepts ⇧←/→ (nudge start) and ⌥←/→ (nudge end) via a local NSEvent
+/// monitor BEFORE AppKit consumes them as text-selection / word-navigation
+/// shortcuts. SwiftUI's `onKeyPress` never sees these combos because the
+/// system swallows them in the responder chain first.
+///
+/// Returns `true` (swallows the event) only when the corresponding handler
+/// is called; all other events are passed through untouched.
+private struct BoundaryKeyMonitor: NSViewRepresentable {
+    let onNudgeStart: (_ delta: Int) -> Void
+    let onNudgeEnd:   (_ delta: Int) -> Void
+
+    func makeNSView(context: Context) -> MonitorHost {
+        let host = MonitorHost()
+        host.onNudgeStart = onNudgeStart
+        host.onNudgeEnd   = onNudgeEnd
+        return host
+    }
+
+    func updateNSView(_ nsView: MonitorHost, context: Context) {
+        nsView.onNudgeStart = onNudgeStart
+        nsView.onNudgeEnd   = onNudgeEnd
+    }
+
+    final class MonitorHost: NSView {
+        var onNudgeStart: ((_ delta: Int) -> Void)?
+        var onNudgeEnd:   ((_ delta: Int) -> Void)?
+        private var monitor: Any?
+
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            if window != nil {
+                monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+                    guard let self else { return event }
+                    return self.handle(event)
+                }
+            } else {
+                if let m = monitor { NSEvent.removeMonitor(m); monitor = nil }
+            }
+        }
+
+        private func handle(_ event: NSEvent) -> NSEvent? {
+            let flags = event.modifierFlags.intersection([.shift, .option, .command, .control])
+            guard event.keyCode == 123 || event.keyCode == 124 else { return event } // ← = 123, → = 124
+            let isLeft  = event.keyCode == 123
+            let delta   = isLeft ? -1 : 1
+
+            if flags == .shift {
+                // ⇧← / ⇧→ — nudge start
+                DispatchQueue.main.async { self.onNudgeStart?(delta) }
+                return nil  // swallow
+            }
+            if flags == .option {
+                // ⌥← / ⌥→ — nudge end
+                DispatchQueue.main.async { self.onNudgeEnd?(delta) }
+                return nil  // swallow
+            }
+            return event  // pass everything else through
         }
     }
 }
