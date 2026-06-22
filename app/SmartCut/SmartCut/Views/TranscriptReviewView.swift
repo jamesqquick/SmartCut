@@ -385,38 +385,72 @@ struct TranscriptReviewView: View {
             .overlay(Capsule().stroke(color.opacity(0.3), lineWidth: 1))
     }
 
-    private func actionButton(systemImage: String, label: String, color: Color = Theme.bodyText,
-                               isActive: Bool = false, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Label(label, systemImage: systemImage)
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(isActive ? color : Theme.bodyText)
-                .padding(.horizontal, 10).padding(.vertical, 7)
-                .background(
-                    RoundedRectangle(cornerRadius: Theme.radius, style: .continuous)
-                        .fill(isActive ? color.opacity(0.12) : Theme.elevated)
-                        .overlay(RoundedRectangle(cornerRadius: Theme.radius, style: .continuous)
-                            .stroke(isActive ? color.opacity(0.4) : Theme.borderStrong, lineWidth: 1))
-                )
+    private func actionButton(
+        systemImage: String, label: String, keycap: String? = nil,
+        color: Color = Theme.bodyText, isActive: Bool = false,
+        action: @escaping () -> Void
+    ) -> some View {
+        let fg = isActive ? color : Theme.bodyText
+        return Button(action: action) {
+            HStack(spacing: 6) {
+                Label(label, systemImage: systemImage)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(fg)
+                if let k = keycap {
+                    Text(k)
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(fg.opacity(0.55))
+                        .padding(.horizontal, 5).padding(.vertical, 2)
+                        .background(
+                            RoundedRectangle(cornerRadius: 4, style: .continuous)
+                                .fill(Color.primary.opacity(0.06))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 4, style: .continuous)
+                                        .stroke(fg.opacity(0.2), lineWidth: 1)
+                                )
+                        )
+                }
+            }
+            .padding(.horizontal, 10).padding(.vertical, 7)
+            .background(
+                RoundedRectangle(cornerRadius: Theme.radius, style: .continuous)
+                    .fill(isActive ? color.opacity(0.12) : Theme.elevated)
+                    .overlay(RoundedRectangle(cornerRadius: Theme.radius, style: .continuous)
+                        .stroke(isActive ? color.opacity(0.4) : Theme.borderStrong, lineWidth: 1))
+            )
         }
         .buttonStyle(.plain)
     }
 
     private var audioButton: some View {
         let isPlaying = audio.isPlaying, isLoading = audio.isLoading
+        let color: Color = isPlaying ? Theme.good : Theme.bodyText
         return Button {
             if isPlaying || isLoading { audio.stop() } else { playAudioPreview() }
         } label: {
-            Label(isPlaying ? "Stop" : "Audio", systemImage: isPlaying ? "stop.fill" : "speaker.wave.2")
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(isPlaying ? Theme.good : Theme.bodyText)
-                .padding(.horizontal, 10).padding(.vertical, 7)
-                .background(
-                    RoundedRectangle(cornerRadius: Theme.radius, style: .continuous)
-                        .fill(isPlaying ? Theme.good.opacity(0.12) : Theme.elevated)
-                        .overlay(RoundedRectangle(cornerRadius: Theme.radius, style: .continuous)
-                            .stroke(isPlaying ? Theme.good.opacity(0.4) : Theme.borderStrong, lineWidth: 1))
-                )
+            HStack(spacing: 6) {
+                Label(isPlaying ? "Stop" : "Audio",
+                      systemImage: isPlaying ? "stop.fill" : "speaker.wave.2")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(color)
+                Text("A")
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(color.opacity(0.55))
+                    .padding(.horizontal, 5).padding(.vertical, 2)
+                    .background(
+                        RoundedRectangle(cornerRadius: 4, style: .continuous)
+                            .fill(Color.primary.opacity(0.06))
+                            .overlay(RoundedRectangle(cornerRadius: 4, style: .continuous)
+                                .stroke(color.opacity(0.2), lineWidth: 1))
+                    )
+            }
+            .padding(.horizontal, 10).padding(.vertical, 7)
+            .background(
+                RoundedRectangle(cornerRadius: Theme.radius, style: .continuous)
+                    .fill(isPlaying ? Theme.good.opacity(0.12) : Theme.elevated)
+                    .overlay(RoundedRectangle(cornerRadius: Theme.radius, style: .continuous)
+                        .stroke(isPlaying ? Theme.good.opacity(0.4) : Theme.borderStrong, lineWidth: 1))
+            )
         }
         .buttonStyle(.plain)
         .keyboardShortcut("a", modifiers: [])
@@ -424,15 +458,16 @@ struct TranscriptReviewView: View {
     }
 
     private var videoButton: some View {
-        actionButton(systemImage: inspectOpen ? "video.fill" : "video", label: "Video",
+        actionButton(systemImage: inspectOpen ? "video.fill" : "video",
+                     label: "Video", keycap: "V",
                      color: Theme.indigo, isActive: inspectOpen) { toggleInspect() }
         .keyboardShortcut("v", modifiers: [])
         .help("Watch the resulting video clip (V)")
     }
 
     private var rejectButton: some View {
-        actionButton(systemImage: "xmark", label: "Reject", color: Theme.danger,
-                     isActive: currentCut?.status == .rejected) {
+        actionButton(systemImage: "xmark", label: "Reject", keycap: "⌫",
+                     color: Theme.danger, isActive: currentCut?.status == .rejected) {
             appState.rejectCurrent(); inspectOpen = false; audio.stop(); video.stop()
         }
         .keyboardShortcut(.delete, modifiers: [])
@@ -440,8 +475,8 @@ struct TranscriptReviewView: View {
     }
 
     private var approveButton: some View {
-        actionButton(systemImage: "checkmark", label: "Approve", color: Theme.good,
-                     isActive: currentCut?.status == .approved) {
+        actionButton(systemImage: "checkmark", label: "Approve", keycap: "↵",
+                     color: Theme.good, isActive: currentCut?.status == .approved) {
             appState.approveCurrent(); inspectOpen = false; audio.stop(); video.stop()
         }
         .keyboardShortcut(.return, modifiers: [])
