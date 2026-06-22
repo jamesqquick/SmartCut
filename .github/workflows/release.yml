@@ -158,8 +158,11 @@ jobs:
         # Fetch the latest Sparkle release dynamically so CI stays current
         # without manual version bumps.  Adds bin/ (sign_update, generate_appcast)
         # to PATH for the signing step below.
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          SPARKLE_VER=$(curl -sS https://api.github.com/repos/sparkle-project/Sparkle/releases/latest \
+          SPARKLE_VER=$(curl -sS -H "Authorization: Bearer $GH_TOKEN" \
+            https://api.github.com/repos/sparkle-project/Sparkle/releases/latest \
             | python3 -c "import sys,json; print(json.load(sys.stdin)['tag_name'])")
           curl -fsSL \
             "https://github.com/sparkle-project/Sparkle/releases/download/${SPARKLE_VER}/Sparkle-${SPARKLE_VER}.tar.xz" \
