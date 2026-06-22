@@ -184,9 +184,11 @@ jobs:
         env:
           SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
         run: |
-          # Sparkle 2.x sign_update: pass the base64 key via -s rather than
-          # as a positional argument (Sparkle 1.x syntax no longer works).
-          SIGN_OUT=$(sign_update -s "$SPARKLE_PRIVATE_KEY" "$RUNNER_TEMP/SmartCut-update.zip")
+          # Sparkle 2.x: write the base64 key to a temp file and pass via
+          # --ed-key-file. The -s flag is deprecated and exits 1 in recent builds.
+          printf '%s' "$SPARKLE_PRIVATE_KEY" > /tmp/sparkle_key
+          SIGN_OUT=$(sign_update --ed-key-file /tmp/sparkle_key "$RUNNER_TEMP/SmartCut-update.zip")
+          rm -f /tmp/sparkle_key
           ED_SIG=$(echo "$SIGN_OUT" | grep -oE 'edSignature="[^"]+"' | cut -d'"' -f2)
           FILE_SIZE=$(wc -c < "$RUNNER_TEMP/SmartCut-update.zip" | tr -d ' ')
           echo "ED_SIG=$ED_SIG"       >> "$GITHUB_ENV"
