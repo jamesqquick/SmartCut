@@ -256,7 +256,12 @@ struct TranscriptReviewView: View {
               let duration = appState.metadata?.durationSec
         else { return }
 
-        let (focusStart, focusEnd) = appState.sourceTimes(for: cut)
+        // Use renderTimes (not sourceTimes) so the preview window is centred on the
+        // same boundaries the renderer will use. For unchanged AI cuts these are the
+        // silence-snapped op.start/op.end; for dragged or manual cuts they're word-onset
+        // times. Using sourceTimes (word-onset) here would offset the window from the
+        // actual cut boundary for unchanged AI cuts.
+        let (focusStart, focusEnd) = appState.renderTimes(for: cut)
         guard focusEnd > focusStart else { return }
 
         // Include the previewed cut even if disabled so the user hears what
@@ -265,10 +270,10 @@ struct TranscriptReviewView: View {
         let silences = appState.silenceSegments
         let leadInMs = appState.options.leadInMs
         let tailOutMs = appState.options.tailOutMs
-        let sidecar = appState.sidecar!
+        let engine = appState.engine!
 
         audio.play(key: key) {
-            let clip = try await sidecar.extractEditedPreview(
+            let clip = try await engine.extractEditedPreview(
                 input: input,
                 duration: duration,
                 focusStart: focusStart,

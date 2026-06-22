@@ -187,11 +187,11 @@ struct RetakeCardView: View {
 
     private func playRemovedClip() {
         guard let input = appState.droppedFile else { return }
-        let sidecar = appState.sidecar!
+        let engine = appState.engine!
         let removeStart = op.start
         let removeEnd = op.end
         audio.play(key: removedKey) {
-            let clip = try await sidecar.extractClip(
+            let clip = try await engine.extractClip(
                 input: input, startSec: removeStart, endSec: removeEnd)
             return URL(fileURLWithPath: clip.path)
         }
@@ -199,11 +199,11 @@ struct RetakeCardView: View {
 
     private func playStitchedPreview() {
         guard let input = appState.droppedFile else { return }
-        let sidecar = appState.sidecar!
+        let engine = appState.engine!
         let removeStart = op.start
         let removeEnd = op.end
         audio.play(key: stitchedKey) {
-            let clip = try await sidecar.extractStitchedClip(
+            let clip = try await engine.extractStitchedClip(
                 input: input,
                 removeStart: removeStart,
                 removeEnd: removeEnd
