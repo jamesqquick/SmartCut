@@ -1,21 +1,18 @@
 import * as readline from "node:readline";
 import type { Segment } from "quietcut-core";
 import {
-  type EditPlan,
   type PipelineEvent,
   type RetakeDecision,
   type RetakeReviewResult,
   type ReviewCutDecision,
   runSmartcut,
   type SmartcutConfig,
-  type TranscriptExportFormat,
-  type TranscriptToken,
-  writeTranscriptExport,
 } from "quietcut-core";
 import {
   type EditedPreviewOptions,
   extractClip,
   extractEditedPreview,
+  extractEditedVideoPreview,
   extractStitchedClip,
 } from "./audio-preview.js";
 import { getMetadata } from "./metadata.js";
@@ -53,17 +50,44 @@ const DEFAULT_FILLER_WORDS = new Set([
 // Wire layer: write only protocol messages to stdout, everything else to stderr.
 // -----------------------------------------------------------------------------
 
+/**
+ * Write to a stdio stream without ever letting a broken pipe crash the server.
+ *
+ * When the parent app dies, our stdout/stderr pipes break and writes raise an
+ * async EPIPE 'error' on the stream. With no listener Node promotes that to an
+ * uncaughtException, whose handler (`logError`) writes to stderr *again*,
+ * raising another EPIPE and recursing forever — pegging a CPU core and
+ * starving the event loop so signals and stdin-close never run. Swallowing the
+ * write here (plus the stream 'error' handlers in `main`) breaks that loop.
+ */
+function safeWrite(stream: NodeJS.WriteStream, text: string): void {
+  if (stream.destroyed || stream.writableEnded) return;
+  try {
+    stream.write(text);
+  } catch {
+    // Intentionally swallow: this is only reached for log/teardown writes
+    // after the stream is torn down (e.g. ERR_STREAM_DESTROYED). Dropping a
+    // line here is preferable to letting logging crash or recurse. Normal
+    // protocol writes happen while the stream is live and are unaffected.
+  }
+}
+
 function logInfo(msg: string): void {
-  process.stderr.write(`[quietcut-server] ${msg}\n`);
+  safeWrite(process.stderr, `[quietcut-server] ${msg}\n`);
 }
 
 function logError(err: unknown): void {
   const msg = err instanceof Error ? (err.stack ?? err.message) : String(err);
-  process.stderr.write(`[quietcut-server] ERROR: ${msg}\n`);
+  safeWrite(process.stderr, `[quietcut-server] ERROR: ${msg}\n`);
 }
 
 function send(message: RpcResponse | RpcNotification): void {
-  process.stdout.write(`${JSON.stringify(message)}\n`);
+  safeWrite(process.stdout, `${JSON.stringify(message)}\n`);
+}
+
+/** EPIPE means the other end of our stdio is gone — i.e. the parent died. */
+function isBrokenPipe(err: unknown): boolean {
+  return (err as NodeJS.ErrnoException | null)?.code === "EPIPE";
 }
 
 function sendEvent(event: PipelineEvent): void {
@@ -84,18 +108,14 @@ type JobState = {
 let activeJob: JobState | null = null;
 
 /**
- * Snapshot of the most recently completed run, used to export its transcript
- * on demand (the Done screen). Captured from the `reviewReady` (transcript) and
- * `done` (final plan) events as a job streams. Cleared when a new job starts so
- * a stale transcript from a previous file can't be exported mid-run.
+ * The long-running ffmpeg render child of the active job, if any. Tracked so
+ * shutdown can kill it directly instead of waiting out the drain hard-cap and
+ * relying on execa's exit cleanup — which can't run if we're SIGKILLed.
+ * Structural (just `kill`) to avoid importing execa's types into the server.
  */
-type LastRun = {
-  transcript: TranscriptToken[];
-  plan: EditPlan;
-  leadInMs: number;
-  tailOutMs: number;
-};
-let lastRun: LastRun | null = null;
+let activeChild: {
+  kill: (signal?: NodeJS.Signals | number) => boolean;
+} | null = null;
 
 class AsyncQueue<T> {
   private readonly items: T[] = [];
@@ -164,10 +184,8 @@ type ExtractEditedPreviewParams = {
   silences?: Segment[];
 };
 
-type ExportTranscriptParams = {
-  format: TranscriptExportFormat;
-  outputPath: string;
-};
+// Same shape as ExtractEditedPreviewParams — video preview uses identical args.
+type ExtractEditedVideoPreviewParams = ExtractEditedPreviewParams;
 
 const dispatcher = new RpcDispatcher();
 
@@ -244,29 +262,34 @@ dispatcher.register("extractEditedPreview", async (params) => {
   );
 });
 
-dispatcher.register("exportTranscript", async (params) => {
-  const p = params as ExportTranscriptParams | undefined;
-  if (!p?.outputPath || (p.format !== "srt" && p.format !== "ai-json")) {
+dispatcher.register("extractEditedVideoPreview", async (params) => {
+  const p = params as ExtractEditedVideoPreviewParams | undefined;
+  if (
+    !p?.path ||
+    typeof p.duration !== "number" ||
+    typeof p.focusStart !== "number" ||
+    typeof p.focusEnd !== "number"
+  ) {
     throw new RpcDispatchError(
       RPC_ERROR.invalidParams,
-      "exportTranscript requires { format: 'srt' | 'ai-json', outputPath }",
+      "extractEditedVideoPreview requires { path, duration, focusStart, focusEnd }",
     );
   }
-  if (!lastRun || lastRun.transcript.length === 0) {
-    throw new RpcDispatchError(
-      RPC_ERROR.invalidParams,
-      "No transcript available to export. Finish a cut first.",
-    );
-  }
-  const edited = await writeTranscriptExport(
-    p.outputPath,
-    p.format,
-    lastRun.transcript,
-    lastRun.plan,
-    lastRun.leadInMs,
-    lastRun.tailOutMs,
+  const opts: EditedPreviewOptions = {
+    padSec: p.padSec,
+    tailSec: p.tailSec,
+    leadInMs: p.leadInMs,
+    tailOutMs: p.tailOutMs,
+    cuts: p.cuts,
+    silences: p.silences,
+  };
+  return await extractEditedVideoPreview(
+    p.path,
+    p.duration,
+    p.focusStart,
+    p.focusEnd,
+    opts,
   );
-  return { ok: true, path: p.outputPath, wordCount: edited.words.length };
 });
 
 dispatcher.register("start", async (params) => {
@@ -392,14 +415,13 @@ function startJob(config: SmartcutConfig, whisperModel: string): JobState {
     finished: Promise.resolve(),
   };
 
-  // A new run invalidates any previously exportable transcript.
-  lastRun = null;
-
   state.finished = (async () => {
-    const gen = runSmartcut(config, whisperModel);
+    const gen = runSmartcut(config, whisperModel, {
+      onProcess: (proc) => {
+        activeChild = proc;
+      },
+    });
     let nextDecision: JobDecision | undefined;
-    // Captured as events stream; finalized into `lastRun` on `done`.
-    let runTranscript: TranscriptToken[] = [];
 
     try {
       while (true) {
@@ -408,18 +430,6 @@ function startJob(config: SmartcutConfig, whisperModel: string): JobState {
         if (done) break;
 
         sendEvent(value);
-
-        // Snapshot the transcript + final plan so the Done screen can export.
-        if (value.type === "reviewReady" && value.transcript.length > 0) {
-          runTranscript = value.transcript;
-        } else if (value.type === "done") {
-          lastRun = {
-            transcript: runTranscript,
-            plan: value.plan,
-            leadInMs: config.leadInMs,
-            tailOutMs: config.tailOutMs,
-          };
-        }
 
         // If the generator is waiting on a decision, block until the client
         // sends one. `retakeProposed` awaits a per-cut `decide`; `reviewReady`
@@ -437,6 +447,7 @@ function startJob(config: SmartcutConfig, whisperModel: string): JobState {
       sendEvent({ type: "error", message });
       logError(err);
     } finally {
+      activeChild = null;
       if (state === activeJob) activeJob = null;
     }
   })();
@@ -475,20 +486,87 @@ async function drainInFlight(): Promise<void> {
   }
 }
 
+let shuttingDown = false;
+
+/**
+ * Cancel any active job, drain in-flight work, then exit — but never linger.
+ * A hard-cap timer guarantees we exit even if draining stalls (e.g. the parent
+ * vanished mid-job), so the sidecar can never become a runaway orphan.
+ */
+function gracefulShutdown(reason: string): void {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  logInfo(`${reason}; shutting down`);
+  if (activeJob) {
+    activeJob.cancelRequested = true;
+    activeJob.decisions.push({ kind: "cancel" });
+  }
+  // Kill the in-flight ffmpeg render directly. `cancel` only lands at the
+  // generator's yield points, not mid-render, so without this the drain below
+  // would wait out the full hard-cap while ffmpeg keeps burning a core. Killing
+  // it makes render() reject, the job finish, and the drain resolve promptly.
+  // Other long stages (whisper/extract) aren't tracked here; they're bounded
+  // by the hard-cap below and reaped by execa's exit cleanup.
+  activeChild?.kill("SIGKILL");
+  const forceExit = setTimeout(() => process.exit(0), 2000);
+  forceExit.unref();
+  drainInFlight().finally(() => process.exit(0));
+}
+
+/**
+ * Exit immediately — used when the parent is already gone (broken pipe or
+ * reparenting). Draining would be pointless (every protocol write would just
+ * EPIPE) and must not be gated behind `shuttingDown`, so that a parent death
+ * detected *during* a graceful drain still exits right away rather than
+ * waiting out the drain's hard-cap.
+ *
+ * `process.exit` also runs execa's signal-exit cleanup (SIGTERM) on any child,
+ * but we SIGKILL the tracked render directly first so its teardown doesn't
+ * depend on signal-exit timing while the parent is collapsing.
+ */
+function exitNow(): never {
+  activeChild?.kill("SIGKILL");
+  process.exit(0);
+}
+
 function main(): void {
-  process.on("uncaughtException", (err) => logError(err));
-  process.on("unhandledRejection", (err) => logError(err));
+  // Remember who launched us. If we get reparented, the app died and we must
+  // not keep running (on macOS an orphan reparents to launchd, pid 1).
+  const initialPpid = process.ppid;
+
+  process.on("uncaughtException", (err) => {
+    if (isBrokenPipe(err)) exitNow();
+    logError(err);
+  });
+  process.on("unhandledRejection", (err) => {
+    if (isBrokenPipe(err)) exitNow();
+    logError(err);
+  });
+
+  // A broken stdio pipe means the parent is gone. Exit instead of letting the
+  // EPIPE bubble to uncaughtException and recurse.
+  const onPipeError = (err: unknown) => {
+    if (isBrokenPipe(err)) exitNow();
+  };
+  process.stdout.on("error", onPipeError);
+  process.stderr.on("error", onPipeError);
 
   for (const signal of ["SIGINT", "SIGTERM"] as const) {
-    process.on(signal, () => {
-      logInfo(`received ${signal}, shutting down`);
-      if (activeJob) {
-        activeJob.cancelRequested = true;
-        activeJob.decisions.push({ kind: "cancel" });
-      }
-      drainInFlight().finally(() => process.exit(0));
-    });
+    process.on(signal, () => gracefulShutdown(`received ${signal}`));
   }
+
+  // Safety net: if the parent is SIGKILLed (e.g. the Xcode Stop button), no
+  // signal or pipe-close is guaranteed to reach us, so poll for reparenting.
+  // The parent is gone, so exit immediately rather than draining. Unref'd so
+  // it never keeps the event loop alive on its own.
+  const parentWatch = setInterval(() => {
+    const ppid = process.ppid;
+    if (ppid !== initialPpid || ppid === 1) {
+      logInfo(`parent ${initialPpid} exited (now ${ppid})`);
+      exitNow();
+    }
+  }, 1000);
+  parentWatch.unref();
 
   const rl = readline.createInterface({
     input: process.stdin,
@@ -497,10 +575,7 @@ function main(): void {
   rl.on("line", (line) => {
     trackInFlight(handleLine(line).catch((err) => logError(err)));
   });
-  rl.on("close", () => {
-    logInfo("stdin closed, draining and exiting");
-    drainInFlight().finally(() => process.exit(0));
-  });
+  rl.on("close", () => gracefulShutdown("stdin closed"));
 
   logInfo("ready");
 }

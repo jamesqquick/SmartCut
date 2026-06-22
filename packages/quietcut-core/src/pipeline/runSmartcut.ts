@@ -1,5 +1,6 @@
 import { existsSync } from "node:fs";
 import { stat } from "node:fs/promises";
+import type { ResultPromise } from "execa";
 import { detectSilences } from "../detect.js";
 import {
   buildEditPlan,
@@ -38,6 +39,16 @@ import {
   toTranscriptTokens,
 } from "./review-batch.js";
 
+/** Optional lifecycle hooks for callers that need to reach into the run. */
+export type SmartcutHooks = {
+  /**
+   * Called synchronously with the long-running ffmpeg render child as soon as
+   * it spawns. Lets a caller (the sidecar) kill it on shutdown/cancel so the
+   * render doesn't outlive the run as an orphaned process.
+   */
+  onProcess?: (proc: ResultPromise) => void;
+};
+
 /**
  * The async generator that drives a smartcut run.
  *
@@ -52,6 +63,7 @@ import {
 export async function* runSmartcut(
   config: SmartcutConfig,
   whisperModel: string,
+  hooks: SmartcutHooks = {},
 ): AsyncGenerator<
   PipelineEvent,
   void,
@@ -619,6 +631,7 @@ export async function* runSmartcut(
         });
         flushProgress();
       },
+      onProcess: hooks.onProcess,
     },
   ).then(
     () => ({ ok: true as const }),

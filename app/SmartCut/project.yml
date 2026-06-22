@@ -1,4 +1,10 @@
 name: SmartCut
+
+packages:
+  Sparkle:
+    url: https://github.com/sparkle-project/Sparkle
+    from: "2.0.0"
+
 options:
   bundleIdPrefix: dev.jamesqquick
   createIntermediateGroups: true
@@ -36,6 +42,9 @@ targets:
         excludes:
           - "Info.plist"
           - "SmartCut.entitlements"
+    dependencies:
+      - package: Sparkle
+        product: Sparkle
     resources:
       - path: SmartCut/Assets.xcassets
     info:
@@ -43,12 +52,18 @@ targets:
       properties:
         CFBundleName: SmartCut
         CFBundleDisplayName: SmartCut
-        CFBundleShortVersionString: "0.1.0"
+        CFBundleShortVersionString: "0.1.1"
         CFBundleVersion: "1"
         CFBundleIconName: AppIcon
         LSMinimumSystemVersion: "14.0"
         NSHighResolutionCapable: true
         NSPrincipalClass: NSApplication
+        # Sparkle auto-update feed URL (stable raw GitHub URL, updated by CI each release).
+        SUFeedURL: https://raw.githubusercontent.com/jamesqquick/SmartCut/main/docs/appcast.xml
+        # EdDSA public key for update signature verification.
+        # Generate with: ./bin/generate_keys (from a Sparkle release tarball).
+        # Store the private key as SPARKLE_PRIVATE_KEY in GitHub Actions secrets.
+        SUPublicEDKey: PkWoESqIh2Qu4y0cyLiQ4nHeJBeFRdBEfdib64AhRWw=
         # Allow drag-and-drop of media files of any type the user picks.
         CFBundleDocumentTypes:
           - CFBundleTypeName: Video
@@ -73,29 +88,5 @@ targets:
         COMBINE_HIDPI_IMAGES: "YES"
         GENERATE_INFOPLIST_FILE: "NO"
         DEVELOPMENT_TEAM: ""
-    preBuildScripts:
-      # Build the Node sidecar and copy the self-contained server.cjs into the
-      # app bundle's Resources so SmartCut.app is portable (no workspace path
-      # dependency at runtime). Resolved at launch via Bundle.main.
-      - name: Bundle quietcut-server sidecar
-        basedOnDependencyAnalysis: false
-        script: |
-          set -euo pipefail
-          REPO_ROOT="$SRCROOT/../.."
-          export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
-          SIDECAR="$REPO_ROOT/packages/quietcut-server/dist/server.cjs"
-
-          # Rebuild the sidecar when pnpm is on PATH; otherwise fall back to an
-          # existing bundle (e.g. CI that built it in a prior step).
-          if command -v pnpm >/dev/null 2>&1; then
-            ( cd "$REPO_ROOT" && pnpm --filter quietcut-server build )
-          fi
-
-          if [ ! -f "$SIDECAR" ]; then
-            echo "error: quietcut-server bundle missing at $SIDECAR — run 'pnpm --filter quietcut-server build'." >&2
-            exit 1
-          fi
-
-          DEST="$BUILT_PRODUCTS_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH"
-          mkdir -p "$DEST"
-          cp "$SIDECAR" "$DEST/server.cjs"
+    # preBuildScripts removed: the Node sidecar is no longer bundled.
+    # The pipeline now runs natively in Swift (see Engine/ folder).
