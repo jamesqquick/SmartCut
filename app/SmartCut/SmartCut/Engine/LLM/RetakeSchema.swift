@@ -58,9 +58,11 @@ func validateRetakeCuts(_ cuts: [RetakeCut], tokenCount: Int) throws {
                 message: "cuts[\(i)]: keepStartIndex (\(c.keepStartIndex)) must be <= keepEndIndex (\(c.keepEndIndex)).")
         }
     }
-    // Disjoint check.
+    // Disjoint check. `dropFirst()` is empty-safe — `1..<sorted.count` would
+    // crash with "Range requires lowerBound <= upperBound" when the LLM
+    // returns zero cuts (a valid "no retakes found" result).
     let sorted = cuts.sorted { $0.abandonedStartIndex < $1.abandonedStartIndex }
-    for i in 1..<sorted.count {
+    for i in sorted.indices.dropFirst() {
         let prev = sorted[i - 1]
         let curr = sorted[i]
         guard curr.abandonedStartIndex > prev.keepEndIndex else {
