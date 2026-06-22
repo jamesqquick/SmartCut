@@ -8,6 +8,20 @@
     <description>SmartCut release history.</description>
     <language>en</language>
 
+        <item>
+      <title>SmartCut 0.2.0</title>
+      <pubDate>Mon, 22 Jun 2026 20:26:16 +0000</pubDate>
+      <sparkle:version>2</sparkle:version>
+      <sparkle:shortVersionString>0.2.0</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      <sparkle:releaseNotesLink>https://github.com/jamesqquick/SmartCut/releases/tag/v0.2.0</sparkle:releaseNotesLink>
+      <enclosure
+        url="https://github.com/jamesqquick/SmartCut/releases/download/v0.2.0/SmartCut-update.zip"
+        sparkle:edSignature="o0wBPKBevpBB+p8NThxiVptodPkdGG3s2lQaaxpzGyr+puh6xySakchgk21w+YMBgBHmO/YtyzIpjH0Egd9BBg=="
+        length="2556480"
+        type="application/zip" />
+    </item>
+
     <!-- RELEASES PREPENDED BY CI ABOVE THIS LINE -->
 
   </channel>
