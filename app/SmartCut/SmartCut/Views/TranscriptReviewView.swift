@@ -265,10 +265,10 @@ struct TranscriptReviewView: View {
         let silences = appState.silenceSegments
         let leadInMs = appState.options.leadInMs
         let tailOutMs = appState.options.tailOutMs
-        let sidecar = appState.sidecar!
+        let engine = appState.engine!
 
         audio.play(key: key) {
-            let clip = try await sidecar.extractEditedPreview(
+            let clip = try await engine.extractEditedPreview(
                 input: input,
                 duration: duration,
                 focusStart: focusStart,

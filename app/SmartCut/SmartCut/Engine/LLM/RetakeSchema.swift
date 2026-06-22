@@ -2,18 +2,12 @@ import Foundation
 
 // MARK: - RetakeCut (tool input from the LLM)
 
-struct RetakeCut: Sendable {
+struct RetakeCut: Decodable, Sendable {
     let abandonedStartIndex: Int
     let keepStartIndex: Int
     let keepEndIndex: Int
     let reason: String
-    let confidence: Int   // 0-100
-
-    // MARK: - JSON decoding
-
-    enum CodingKeys: String, CodingKey {
-        case abandonedStartIndex, keepStartIndex, keepEndIndex, reason, confidence
-    }
+    let confidence: Int   // 0-100, clamped at decode time
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -24,9 +18,11 @@ struct RetakeCut: Sendable {
         let rawConf         = try c.decodeIfPresent(Double.self, forKey: .confidence)
         confidence          = rawConf.map { max(0, min(100, Int($0.rounded()))) } ?? 50
     }
-}
 
-extension RetakeCut: Decodable {}
+    private enum CodingKeys: String, CodingKey {
+        case abandonedStartIndex, keepStartIndex, keepEndIndex, reason, confidence
+    }
+}
 
 struct RetakeToolInput: Decodable, Sendable {
     let cuts: [RetakeCut]
@@ -88,13 +84,11 @@ func sanitizeRetakeCuts(
     var cleaned: [RetakeCut] = []
 
     for original in cuts {
-        // Clamp single off-by-one.
-        var aIdx = original.abandonedStartIndex
-        var kS   = original.keepStartIndex
-        var kE   = original.keepEndIndex
+        let aIdx = original.abandonedStartIndex
+        let kS   = original.keepStartIndex
+        // Clamp a single off-by-one on the inclusive kept-take end.
+        let kE   = original.keepEndIndex == tokenCount ? tokenCount - 1 : original.keepEndIndex
         let conf = original.confidence
-
-        if kE == tokenCount { kE = tokenCount - 1 }
 
         guard aIdx >= 0 && aIdx < tokenCount,
               kS  >= 0 && kS  < tokenCount,
@@ -114,7 +108,6 @@ func sanitizeRetakeCuts(
                 reason: "keepStartIndex (\(kS)) after keepEndIndex (\(kE))"))
             continue
         }
-        // Re-create with possibly clamped kE.
         cleaned.append(RetakeCut(
             abandonedStartIndex: aIdx, keepStartIndex: kS,
             keepEndIndex: kE, reason: original.reason, confidence: conf

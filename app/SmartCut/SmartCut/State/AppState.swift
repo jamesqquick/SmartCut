@@ -231,10 +231,6 @@ final class AppState {
 
     private(set) var engine: PipelineEngine!
 
-    /// Expose engine as `sidecar` so views that still use `appState.sidecar`
-    /// compile without modification during the transition.
-    var sidecar: PipelineEngine! { engine }
-
     /// Process-wide handle to the live AppState so `AppDelegate` can tear the
     /// engine down on termination. Weak: AppState's lifetime is owned by the
     /// SwiftUI `App`, not this reference. There is only ever one instance.
@@ -619,7 +615,6 @@ final class AppState {
 
         case .done(let plan, let output, let savedSec, let savedPercent, let elapsedSec):
             let outURL = URL(fileURLWithPath: output)
-            let retakesProposed = decisions.count
             // "Kept" = proposals the user disabled (batch flow) or chose to keep
             // (legacy per-cut flow).
             let retakesKept =
@@ -636,7 +631,6 @@ final class AppState {
                 retakesKept: retakesKept,
                 elapsedSec: elapsedSec
             )
-            _ = retakesProposed
             screen = .done
             appendLog(
                 .ok,
@@ -667,7 +661,7 @@ final class AppState {
         Array(activityLog.suffix(limit).reversed())
     }
 
-    /// Snapshot of recent process stderr for the banner.
+    /// Recent process stderr from the pipeline engine — shown in the error banner.
     var sidecarStderrSnapshot: String { engine?.stderrSnapshot ?? "" }
 
     // MARK: - Helpers

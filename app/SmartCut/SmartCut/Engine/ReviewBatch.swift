@@ -3,7 +3,10 @@ import Foundation
 // MARK: - ReviewBatch
 // Ports quietcut-core/src/pipeline/review-batch.ts
 
-let manualOpPrefix = "m-"
+// Prefix used for user-created cuts; must match AppState.createManualCut.
+// Private — only ReviewBatch and AppState need to agree on this constant;
+// it is not part of the public pipeline protocol.
+private let manualOpPrefix = "m-"
 
 // MARK: - timeRangeToIndices
 
@@ -87,14 +90,17 @@ private func rebuildOpFromRange(
 func buildManualOp(_ tokens: [Token], removeStartIndex: Int, removeEndIndex: Int) -> RemoveRetakeOp? {
     let (s, e, start, end) = rangeBounds(tokens, removeStartIndex: removeStartIndex, removeEndIndex: removeEndIndex)
     guard end > start else { return nil }
+    // For manual cuts there's no AI proposal, so keptText and contextAfter are both
+    // the sentence that follows the removed span — intentional, not a copy-paste bug.
+    let after = sentenceAfter(tokens, startIdx: e + 1)
     return RemoveRetakeOp(
         type: "removeRetake",
         start: start, end: end,
         reason: "Manual cut",
-        removedText: reconstructText(tokens, from: s, to: e),
-        keptText:    sentenceAfter(tokens, startIdx: e + 1),
+        removedText:   reconstructText(tokens, from: s, to: e),
+        keptText:      after,
         contextBefore: sentenceBefore(tokens, endIdx: s - 1),
-        contextAfter:  sentenceAfter(tokens, startIdx: e + 1),
+        contextAfter:  after,
         confidence: 100
     )
 }

@@ -15,19 +15,22 @@ private func overlapsAny(_ region: Segment, cuts: [Segment]) -> Bool {
 /// Detect retakes via the LLM, snap each cut region to silence boundaries,
 /// and convert to RemoveRetakeOp operations.
 ///
+/// Expects already-merged (whole-word) tokens; sub-word merging must be done
+/// once by the caller and the same slice reused for `buildReviewProposals`.
+///
 /// Runs up to `passes` detection passes; each pass re-runs the LLM over only
 /// the words that survived the previous passes.
 func planLlmRetakeOps(
     client: GatewayClient,
     model: String,
-    tokens: [Token],
+    mergedTokens: [Token],     // pre-merged whole-word tokens
     snapSilences: [Segment],
     maxRetakeRatio: Double = 15,
     passes: Int = 2
 ) async throws -> [RemoveRetakeOp] {
     var allOps: [RemoveRetakeOp] = []
     var cutRegions: [Segment]    = []
-    var working = tokens
+    var working = mergedTokens
     var passesRun = 0
 
     for pass in 0..<max(1, passes) {
@@ -37,7 +40,7 @@ func planLlmRetakeOps(
         let retakes = try await detectRetakesLLM(
             client: client,
             model: model,
-            rawTokens: working,
+            tokens: working,       // already merged
             maxRetakeRatio: maxRetakeRatio
         )
         guard !retakes.isEmpty else { break }

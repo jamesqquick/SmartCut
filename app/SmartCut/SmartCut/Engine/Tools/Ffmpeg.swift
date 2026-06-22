@@ -74,19 +74,12 @@ enum Ffmpeg {
                 "-f", "null", "-",
             ],
             onStderrLine: { line in
-                if let m = line.range(of: #"silence_start:\s*([\d.]+)"#, options: .regularExpression) {
-                    let nums = line[m].components(separatedBy: CharacterSet.decimalDigits.inverted)
-                        .filter { !$0.isEmpty }
-                    if let d = nums.first.flatMap(Double.init) {
-                        currentStart = d
-                    }
-                } else if let m = line.range(of: #"silence_end:\s*([\d.]+)"#, options: .regularExpression) {
-                    let nums = line[m].components(separatedBy: CharacterSet.decimalDigits.inverted)
-                        .filter { !$0.isEmpty }
-                    if let d = nums.first.flatMap(Double.init), let start = currentStart {
-                        silences.append(Segment(start: start, end: d))
-                        currentStart = nil
-                    }
+                if let t = silenceTimestamp(from: line, key: "silence_start") {
+                    currentStart = t
+                } else if let t = silenceTimestamp(from: line, key: "silence_end"),
+                          let start = currentStart {
+                    silences.append(Segment(start: start, end: t))
+                    currentStart = nil
                 }
             }
         )
@@ -96,6 +89,34 @@ enum Ffmpeg {
             silences.append(Segment(start: start, end: duration))
         }
         return silences
+    }
+
+    // MARK: - Silence timestamp parsing
+
+    /// Extract a floating-point timestamp following `key:` in an ffmpeg silencedetect line.
+    ///
+    /// ffmpeg emits lines like:
+    ///   [silencedetect @ 0x...] silence_start: 1.23456
+    ///   [silencedetect @ 0x...] silence_end: 5.678 | silence_duration: 4.444
+    ///
+    /// The previous approach split on CharacterSet.decimalDigits.inverted which treats the
+    /// decimal point as a separator — "1.234" → "1" — truncating every boundary to the
+    /// nearest whole second. This version walks past the key and reads the first token.
+    private static func silenceTimestamp(from line: String, key: String) -> Double? {
+        // Fast reject: key must appear in the line.
+        guard let keyRange = line.range(of: key) else { return nil }
+        // Everything after the key, e.g. ": 1.23456 | ..."
+        let suffix = line[keyRange.upperBound...]
+        // Skip the colon and any whitespace.
+        let valueStart = suffix.drop(while: { $0 == ":" || $0 == " " })
+        // Take digits and the decimal point until the first non-numeric character.
+        var token = ""
+        for ch in valueStart {
+            if ch.isNumber || ch == "." { token.append(ch) }
+            else if token.isEmpty { continue }  // leading non-numeric (shouldn't happen)
+            else { break }
+        }
+        return token.isEmpty ? nil : Double(token)
     }
 
     // MARK: - Render

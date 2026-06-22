@@ -42,14 +42,13 @@ final class PipelineEngine {
         self.onEvent = onEvent
         self.onExit  = onExit
 
-        let r = ProcessRunner()
         var paths: [String] = []
         if let dir = config.ffmpegDir, !dir.isEmpty { paths.append(dir) }
         for fallback in ["/opt/homebrew/bin", "/usr/local/bin"] where !paths.contains(fallback) {
             paths.append(fallback)
         }
-        Task { await r.setExtraPathDirs(paths) }
-        self.runner = r
+        // Pass paths at init time — no async race with the first resolve() call.
+        self.runner = ProcessRunner(extraPathDirs: paths)
 
         self.gatewayConfig = try? GatewayConfig.from(config)
     }
@@ -72,7 +71,9 @@ final class PipelineEngine {
     private func killActiveProcess() {
         guard let p = activeProcess, p.isRunning else { return }
         p.terminate()
-        p.waitUntilExit()
+        // Do not call waitUntilExit() — this is @MainActor-isolated and blocking
+        // the main thread for even a brief SIGTERM drain would freeze the UI.
+        // The OS reaps the child; execa-style signal-exit cleanup is not needed here.
         activeProcess = nil
     }
 
@@ -264,7 +265,9 @@ final class PipelineEngine {
             stageFail(.transcribe, "Transcription failed.")
             emit(.error(message: error.localizedDescription, stage: .transcribe, stack: nil)); return
         }
-        let reviewTokens = mergeSubwordTokens(rawTokens)
+        // Merge sub-word pieces into whole words once; reuse for both the LLM
+        // detector and the review-screen proposals so indices stay aligned.
+        let mergedTokens = mergeSubwordTokens(rawTokens)
         guard !Task.isCancelled else { return }
 
         // --- LLM retake detection ---
@@ -275,7 +278,7 @@ final class PipelineEngine {
             retakeOps = try await planLlmRetakeOps(
                 client: client,
                 model: options.model,
-                tokens: rawTokens,
+                mergedTokens: mergedTokens,
                 snapSilences: snapSilences,
                 maxRetakeRatio: options.maxRetakeRatio,
                 passes: options.passes)
@@ -295,13 +298,13 @@ final class PipelineEngine {
 
         // --- Batch review ---
         stageStart(.review, retakeOps.isEmpty ? "No retakes detected." : "Awaiting transcript review…")
-        let proposals = buildReviewProposals(reviewTokens, retakeOps)
+        let proposals = buildReviewProposals(mergedTokens, retakeOps)
 
         let decision: ReviewDecision = await withCheckedContinuation { cont in
             reviewContinuation = cont
             emit(.reviewReady(
                 total: retakeOps.count,
-                transcript: toTranscriptTokens(reviewTokens),
+                transcript: toTranscriptTokens(mergedTokens),
                 proposals: proposals))
         }
         guard !Task.isCancelled else { return }
@@ -311,7 +314,7 @@ final class PipelineEngine {
             stageFail(.review, "Cancelled.")
             return
         case .submit(let cuts):
-            let approved = applyReviewResult(reviewTokens, proposals, cuts)
+            let approved = applyReviewResult(mergedTokens, proposals, cuts)
             let keptOps: [EnginePlan.Op] = plan.operations.filter {
                 if case .retake = $0 { return false }; return true
             }
@@ -365,14 +368,6 @@ final class PipelineEngine {
             savedSec: savedSec,
             savedPercent: savedPercent,
             elapsedSec: elapsedSec))
-    }
-}
-
-// MARK: - ProcessRunner extra-path helper
-
-extension ProcessRunner {
-    func setExtraPathDirs(_ dirs: [String]) {
-        self.extraPathDirs = dirs
     }
 }
 

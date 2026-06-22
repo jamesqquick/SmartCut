@@ -146,16 +146,21 @@ private func requestRawCuts(
 // MARK: - detectRetakesLLM
 
 /// Detect retakes contextually using Claude.
+///
+/// Expects **already-merged** (whole-word) tokens — sub-word pieces must be
+/// folded before calling so token indices, timestamps, and the indexed transcript
+/// all stay aligned. Call `mergeSubwordTokens` exactly once in the caller and
+/// reuse the result for both the LLM detector and the review-screen proposals.
+///
 /// Ports quietcut-core/src/llm/detect-retakes-llm.ts detectRetakesLLM.
 func detectRetakesLLM(
     client: GatewayClient,
     model: String,
-    rawTokens: [Token],
+    tokens: [Token],           // pre-merged whole-word tokens
     maxRetakeRatio: Double = defaultMaxRetakeRatio
 ) async throws -> [LlmRetake] {
-    guard !rawTokens.isEmpty else { return [] }
+    guard !tokens.isEmpty else { return [] }
 
-    let tokens = mergeSubwordTokens(rawTokens)
     let transcript = buildIndexedTranscript(tokens)
     let userPrompt =
         "Here is the transcript as numbered word tokens (token count: \(tokens.count)).\n\n" +
