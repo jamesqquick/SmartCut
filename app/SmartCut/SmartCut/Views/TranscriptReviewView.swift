@@ -593,10 +593,10 @@ struct TranscriptReviewView: View {
         case KeyEquivalent("k"):
             if appState.currentCutIndex > 0 { appState.navigateTo(appState.currentCutIndex - 1) }
             return .handled
-        case .upArrow where press.modifiers.isEmpty:
+        case .upArrow:
             if appState.currentCutIndex > 0 { appState.navigateTo(appState.currentCutIndex - 1) }
             return .handled
-        case .downArrow where press.modifiers.isEmpty:
+        case .downArrow:
             if appState.currentCutIndex < cuts.count - 1 { appState.navigateTo(appState.currentCutIndex + 1) }
             return .handled
         case .return where press.modifiers.isEmpty:
@@ -616,16 +616,26 @@ struct TranscriptReviewView: View {
         case .escape:
             if inspectOpen { inspectOpen = false; video.stop(); return .handled }
             return .ignored
-        case .leftArrow:
+        // ⌃← / ⌃→  — nudge the START (beginning) of the cut
+        case .leftArrow where press.modifiers == .control:
             guard let cut = currentCut else { return .ignored }
-            if press.modifiers.contains(.option) { appState.adjustCutStart(cut.opId, to: cut.removeStartIndex - 1) }
-            else { appState.adjustCutEnd(cut.opId, to: cut.removeEndIndex - 1) }
+            appState.adjustCutStart(cut.opId, to: cut.removeStartIndex - 1)
             if inspectOpen { playVideoPreview() }
             return .handled
-        case .rightArrow:
+        case .rightArrow where press.modifiers == .control:
             guard let cut = currentCut else { return .ignored }
-            if press.modifiers.contains(.option) { appState.adjustCutStart(cut.opId, to: cut.removeStartIndex + 1) }
-            else { appState.adjustCutEnd(cut.opId, to: cut.removeEndIndex + 1) }
+            appState.adjustCutStart(cut.opId, to: cut.removeStartIndex + 1)
+            if inspectOpen { playVideoPreview() }
+            return .handled
+        // ⌥← / ⌥→  — nudge the END of the cut
+        case .leftArrow where press.modifiers == .option:
+            guard let cut = currentCut else { return .ignored }
+            appState.adjustCutEnd(cut.opId, to: cut.removeEndIndex - 1)
+            if inspectOpen { playVideoPreview() }
+            return .handled
+        case .rightArrow where press.modifiers == .option:
+            guard let cut = currentCut else { return .ignored }
+            appState.adjustCutEnd(cut.opId, to: cut.removeEndIndex + 1)
             if inspectOpen { playVideoPreview() }
             return .handled
         default:
