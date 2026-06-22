@@ -1,17 +1,33 @@
+import Combine
 import Sparkle
 import SwiftUI
 
-/// A menu-item button that triggers Sparkle's update check.
-/// `SPUUpdater` is an `ObservableObject`, so `canCheckForUpdates` drives
-/// the disabled state reactively — the button auto-disables while a check
-/// is already in progress.
+/// Observes `SPUUpdater.canCheckForUpdates` via KVO/Combine so the
+/// menu button can disable itself reactively while a check is in progress.
+/// SPUUpdater is an NSObject but does not conform to ObservableObject
+/// directly, so this thin wrapper bridges it.
+final class CheckForUpdatesViewModel: ObservableObject {
+    @Published var canCheckForUpdates = false
+
+    init(updater: SPUUpdater) {
+        // assign(to:) binds the upstream publisher directly to the @Published
+        // property and manages the lifetime internally — no AnyCancellable needed.
+        updater.publisher(for: \.canCheckForUpdates)
+            .assign(to: &$canCheckForUpdates)
+    }
+}
+
 struct CheckForUpdatesView: View {
-    @ObservedObject var updater: SPUUpdater
+    @ObservedObject private var viewModel: CheckForUpdatesViewModel
+    private let updater: SPUUpdater
+
+    init(updater: SPUUpdater) {
+        self.updater = updater
+        self.viewModel = CheckForUpdatesViewModel(updater: updater)
+    }
 
     var body: some View {
-        Button("Check for Updates\u{2026}") {
-            updater.checkForUpdates()
-        }
-        .disabled(!updater.canCheckForUpdates)
+        Button("Check for Updates\u{2026}", action: updater.checkForUpdates)
+            .disabled(!viewModel.canCheckForUpdates)
     }
 }
