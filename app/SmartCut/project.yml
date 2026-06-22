@@ -63,7 +63,7 @@ targets:
         # EdDSA public key for update signature verification.
         # Generate with: ./bin/generate_keys (from a Sparkle release tarball).
         # Store the private key as SPARKLE_PRIVATE_KEY in GitHub Actions secrets.
-        SUPublicEDKey: REPLACE_WITH_PUBLIC_KEY_FROM_generate_keys
+        SUPublicEDKey: PkWoESqIh2Qu4y0cyLiQ4nHeJBeFRdBEfdib64AhRWw=
         # Allow drag-and-drop of media files of any type the user picks.
         CFBundleDocumentTypes:
           - CFBundleTypeName: Video
