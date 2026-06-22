@@ -28,3 +28,7 @@ xcuserdata/
 # Agent tooling
 .agents/
 skills-lock.json
+
+# Brainstorm / spec artifacts (kept local, not checked in)
+.superpowers/
+docs/superpowers/
