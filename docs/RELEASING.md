@@ -16,7 +16,7 @@ Pre-release versions (tags containing a hyphen, e.g. `v0.2.0-beta.1`) are automa
 
 ## Step 1 — Bump the version
 
-Use the helper script to update all five version strings in one command:
+Use the helper script to update all release version strings in one command:
 
 ```bash
 ./scripts/bump-version.sh 0.2.0
@@ -24,6 +24,7 @@ Use the helper script to update all five version strings in one command:
 
 This updates:
 - `app/SmartCut/project.yml` — `CFBundleShortVersionString` (shown in Finder / About)
+- `app/SmartCut/SmartCut/Info.plist` — `CFBundleShortVersionString` and `CFBundleVersion` used by the release workflow/appcast
 - `package.json` — root workspace
 - `packages/quietcut-core/package.json`
 - `packages/quietcut-cli/package.json`
