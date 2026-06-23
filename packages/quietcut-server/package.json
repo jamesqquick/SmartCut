@@ -1,6 +1,6 @@
 {
   "name": "quietcut-server",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "private": true,
   "description": "JSON-RPC stdio sidecar around quietcut-core for the SmartCut macOS app.",
   "type": "module",

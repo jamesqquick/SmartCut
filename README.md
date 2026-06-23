@@ -201,7 +201,7 @@ The version lives in two places that must be bumped together. Use the helper scr
 ./scripts/bump-version.sh 0.2.0
 ```
 
-This updates `app/SmartCut/project.yml` (`CFBundleShortVersionString`) and all four `package.json` files.
+This updates `app/SmartCut/project.yml`, `app/SmartCut/SmartCut/Info.plist`, and all four `package.json` files.
 
 ## Releasing
 

@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
-# bump-version.sh — Bump the SmartCut version across all five version strings.
+# bump-version.sh — Bump the SmartCut version across all release version strings.
 #
 # Usage:
 #   ./scripts/bump-version.sh <new-version>
 #   ./scripts/bump-version.sh 0.2.0
 #
 # Updates:
-#   - app/SmartCut/project.yml         (CFBundleShortVersionString)
+#   - app/SmartCut/project.yml         (CFBundleShortVersionString + CFBundleVersion)
+#   - app/SmartCut/SmartCut/Info.plist (CFBundleShortVersionString + CFBundleVersion)
 #   - package.json                     (root workspace)
 #   - packages/quietcut-core/package.json
 #   - packages/quietcut-cli/package.json
@@ -44,6 +45,21 @@ sed -i '' \
   "s/CFBundleVersion: \"[^\"]*\"/CFBundleVersion: \"${NEW_BUILD}\"/" \
   "$PROJECT_YML"
 echo "  updated: app/SmartCut/project.yml (version ${NEW_VERSION}, build ${NEW_BUILD})"
+
+# --- Info.plist ---
+INFO_PLIST="${REPO_ROOT}/app/SmartCut/SmartCut/Info.plist"
+grep -q '<key>CFBundleShortVersionString</key>' "$INFO_PLIST" \
+  || { echo "error: CFBundleShortVersionString not found in Info.plist" >&2; exit 1; }
+sed -i '' \
+  "/<key>CFBundleShortVersionString<\/key>/{n;s#<string>[^<]*</string>#<string>${NEW_VERSION}</string>#;}" \
+  "$INFO_PLIST"
+
+grep -q '<key>CFBundleVersion</key>' "$INFO_PLIST" \
+  || { echo "error: CFBundleVersion not found in Info.plist" >&2; exit 1; }
+sed -i '' \
+  "/<key>CFBundleVersion<\/key>/{n;s#<string>[^<]*</string>#<string>${NEW_BUILD}</string>#;}" \
+  "$INFO_PLIST"
+echo "  updated: app/SmartCut/SmartCut/Info.plist (version ${NEW_VERSION}, build ${NEW_BUILD})"
 
 # --- package.json files ---
 PACKAGE_FILES=(
