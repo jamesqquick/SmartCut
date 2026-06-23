@@ -22,7 +22,11 @@ export {
 } from "./pipeline/review-batch.js";
 export { runSmartcut } from "./pipeline/runSmartcut.js";
 export { planLlmRetakeOps } from "./planners/llm-retake-planner.js";
-export { render } from "./render.js";
+export {
+  crfToVideoToolboxQuality,
+  type ResolvedVideoEncoder,
+  render,
+} from "./render.js";
 export {
   loadTokensFromTranscript,
   transcribeFromAudio,
@@ -32,6 +36,7 @@ export * from "./transcript-export/index.js";
 export * from "./types.js";
 export {
   assertFfmpegAvailable,
+  detectVideoToolbox,
   extractAudio,
   getDuration,
 } from "./utils/ffmpeg.js";

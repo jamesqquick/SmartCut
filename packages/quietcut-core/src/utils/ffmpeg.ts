@@ -20,6 +20,56 @@ export async function assertFfmpegAvailable(): Promise<void> {
 }
 
 /**
+ * Memoized result of the VideoToolbox capability probe. The sidecar is a
+ * long-lived process, so we probe at most once per run.
+ */
+let videoToolboxProbe: Promise<boolean> | undefined;
+
+/**
+ * Detect whether this ffmpeg build can encode H.264 with VideoToolbox in
+ * constant-quality mode (`-q:v`).
+ *
+ * We run a one-frame encode to the null muxer rather than parsing
+ * `ffmpeg -encoders`: the codec appearing in that list does not guarantee the
+ * host can actually initialize the VideoToolbox session (it depends on macOS
+ * version and hardware) or that `-q:v` constant-quality mode is supported.
+ * Exit code 0 is the only trustworthy signal.
+ *
+ * The result is memoized for the lifetime of the process.
+ */
+export function detectVideoToolbox(): Promise<boolean> {
+  videoToolboxProbe ??= (async () => {
+    try {
+      const result = await execa(
+        "ffmpeg",
+        [
+          "-hide_banner",
+          "-f",
+          "lavfi",
+          "-i",
+          "color=c=black:s=64x64:d=0.1:r=10",
+          "-frames:v",
+          "1",
+          "-c:v",
+          "h264_videotoolbox",
+          "-q:v",
+          "60",
+          "-f",
+          "null",
+          "-",
+        ],
+        { reject: false, timeout: 15_000 },
+      );
+      return result.exitCode === 0;
+    } catch {
+      // Spawn failure, timeout kill, etc. Treat as "hardware unavailable".
+      return false;
+    }
+  })();
+  return videoToolboxProbe;
+}
+
+/**
  * Get the duration of a media file in seconds via ffprobe.
  */
 export async function getDuration(file: string): Promise<number> {

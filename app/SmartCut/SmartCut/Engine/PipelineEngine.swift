@@ -371,6 +371,7 @@ final class PipelineEngine {
                 input: input.path,
                 output: options.output,
                 keep: keep,
+                encoder: options.encoder,
                 crf: options.crf,
                 preset: options.preset,
                 onProcess: { [weak self] p in
@@ -380,6 +381,13 @@ final class PipelineEngine {
                     emitEvent(.renderProgress(
                         frame: p.frame, fps: p.fps, speed: p.speed,
                         percent: p.percent, etaSec: p.etaSec))
+                },
+                onEncoder: { [emitEvent, options] resolved in
+                    let note = resolved == .hardware
+                        ? "Encoding with VideoToolbox (hardware)"
+                        : "Encoding with libx264 (\(options.preset))"
+                    emitEvent(.progress(stage: .render, current: nil, total: nil,
+                                        percent: nil, note: note))
                 },
                 runner: runner)
         } catch {

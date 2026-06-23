@@ -119,6 +119,57 @@ enum Ffmpeg {
         return token.isEmpty ? nil : Double(token)
     }
 
+    // MARK: - VideoToolbox capability probe
+
+    /// Cached result of the hardware-encoder probe. Initialised at most once per
+    /// process; subsequent calls await the same Task and pay no spawn overhead.
+    nonisolated(unsafe) private static var videoToolboxProbeTask: Task<Bool, Never>?
+
+    /// Returns `true` if this ffmpeg build can encode H.264 with VideoToolbox
+    /// in constant-quality (`-q:v`) mode.
+    ///
+    /// We do a one-frame encode to the null muxer rather than parsing
+    /// `ffmpeg -encoders`: the codec appearing in that list does not guarantee
+    /// that the host can initialise the VideoToolbox session or that `-q:v` is
+    /// supported. Exit code 0 is the only trustworthy signal.
+    ///
+    /// The result is memoised for the process lifetime. Two concurrent first
+    /// callers may race and each spawn a probe — both produce the same answer,
+    /// so the last write wins and no data is corrupted.
+    static func detectVideoToolbox(runner: ProcessRunner) async -> Bool {
+        if let existing = videoToolboxProbeTask { return await existing.value }
+        let task = Task<Bool, Never> {
+            guard let result = try? await runner.run(
+                "ffmpeg",
+                args: [
+                    "-hide_banner",
+                    "-f", "lavfi",
+                    "-i", "color=c=black:s=64x64:d=0.1:r=10",
+                    "-frames:v", "1",
+                    "-c:v", "h264_videotoolbox",
+                    "-q:v", "60",
+                    "-f", "null", "-",
+                ],
+                allowNonZero: true
+            ) else { return false }
+            return result.exitCode == 0
+        }
+        videoToolboxProbeTask = task
+        return await task.value
+    }
+
+    // MARK: - CRF → VideoToolbox quality mapping
+
+    /// Map an x264-style CRF (lower = better; UI range 12–30) onto a
+    /// VideoToolbox constant-quality value (`-q:v`, higher = better; 1–100).
+    ///
+    /// VideoToolbox has no CRF. Its 1–100 scale is monotonic (higher q →
+    /// higher bitrate/quality), so we map CRF [12,30] linearly onto [80,40].
+    static func crfToVideoToolboxQuality(_ crf: Int) -> Int {
+        let q = 80 - (crf - 12) * 40 / 18
+        return max(1, min(100, q))
+    }
+
     // MARK: - Render
 
     struct RenderProgress: Sendable {
@@ -129,18 +180,67 @@ enum Ffmpeg {
         var etaSec: Double?
     }
 
+    /// The encoder actually selected after resolving the `encoder` preference.
+    enum ResolvedEncoder: String, Sendable {
+        case hardware = "hardware"
+        case software = "software"
+    }
+
     /// Render output using trim/atrim+concat filter for frame-accurate cuts.
     /// Returns the spawned Process via `onProcess` so callers can kill it on cancel.
+    ///
+    /// `encoder` accepts `"auto"` (VideoToolbox when available, else libx264),
+    /// `"hardware"` (VideoToolbox; throws if unavailable), or `"software"` (libx264).
+    /// `onEncoder` is called once with the resolved encoder before ffmpeg starts,
+    /// letting callers surface a progress note.
     static func render(
         input: String,
         output: String,
         keep: [Segment],
+        encoder: String = "auto",
         crf: Int,
         preset: String,
         onProcess: @escaping @Sendable (Process) -> Void,
         onProgress: @escaping @Sendable (RenderProgress) -> Void,
+        onEncoder: (@Sendable (ResolvedEncoder) -> Void)? = nil,
         runner: ProcessRunner
     ) async throws {
+        // Resolve encoder preference → concrete encoder.
+        let resolved: ResolvedEncoder
+        switch encoder {
+        case "software":
+            resolved = .software
+        case "hardware":
+            let available = await detectVideoToolbox(runner: runner)
+            guard available else {
+                throw EngineError.unexpectedOutput(
+                    "Hardware encoder (h264_videotoolbox) is not available in this ffmpeg build. "
+                    + "Switch to Auto or Software in Settings → Output.")
+            }
+            resolved = .hardware
+        default: // "auto" or unrecognised value
+            resolved = await detectVideoToolbox(runner: runner) ? .hardware : .software
+        }
+        onEncoder?(resolved)
+
+        // Build codec args for the resolved encoder.
+        let codecArgs: [String]
+        switch resolved {
+        case .hardware:
+            codecArgs = [
+                "-c:v", "h264_videotoolbox",
+                "-q:v", String(crfToVideoToolboxQuality(crf)),
+                "-pix_fmt", "yuv420p",
+            ]
+        case .software:
+            codecArgs = [
+                "-c:v", "libx264",
+                "-crf", String(crf),
+                "-preset", preset,
+                "-pix_fmt", "yuv420p",
+            ]
+        }
+
         let filter = buildTrimConcatFilter(keep)
         let totalKeptMs = keep.reduce(0.0) { $0 + ($1.end - $1.start) } * 1000.0
 
@@ -149,10 +249,7 @@ enum Ffmpeg {
             "-i", input,
             "-filter_complex", filter,
             "-map", "[v]", "-map", "[a]",
-            "-c:v", "libx264",
-            "-crf", String(crf),
-            "-preset", preset,
-            "-pix_fmt", "yuv420p",
+        ] + codecArgs + [
             "-c:a", "aac", "-b:a", "192k",
             "-movflags", "+faststart",
             "-progress", "pipe:1",
