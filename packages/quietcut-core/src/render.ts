@@ -1,5 +1,9 @@
 import { execa, type ResultPromise } from "execa";
-import type { Config, Segment } from "./types.js";
+import type { Config, Segment, VideoEncoder } from "./types.js";
+import { detectVideoToolbox } from "./utils/ffmpeg.js";
+
+/** The encoder actually used after resolving "auto"/availability. */
+export type ResolvedVideoEncoder = "hardware" | "software";
 
 /**
  * Progress payload emitted while ffmpeg renders.
@@ -21,7 +25,86 @@ export type RenderOptions = {
    * cancel by killing it. Called synchronously with the spawned proc.
    */
   onProcess?: (proc: ResultPromise) => void;
+  /**
+   * Called once with the encoder actually selected, after resolving "auto"
+   * and probing hardware availability. Lets callers surface/log it.
+   */
+  onEncoder?: (encoder: ResolvedVideoEncoder) => void;
 };
+
+/** ffmpeg encoder name for hardware H.264 on macOS. */
+const VIDEOTOOLBOX_H264 = "h264_videotoolbox";
+
+/**
+ * Map an x264-style CRF (lower = better; UI range 12–30) onto a VideoToolbox
+ * constant-quality value (`-q:v`, higher = better; 1–100).
+ *
+ * VideoToolbox has no CRF. Its 1–100 scale is monotonic (higher q → higher
+ * bitrate/quality), so we map the CRF UI range [12,30] linearly onto [80,40]
+ * and clamp. This keeps the existing Quality slider meaningful when the
+ * renderer falls back to — or is forced onto — hardware encoding.
+ */
+export function crfToVideoToolboxQuality(crf: number): number {
+  const q = Math.round(80 - ((crf - 12) * 40) / 18);
+  return Math.max(1, Math.min(100, q));
+}
+
+/**
+ * Resolve the requested encoder preference into a concrete encoder, probing
+ * VideoToolbox availability when relevant.
+ * - "software" never probes.
+ * - "hardware" probes and throws if unavailable (fail fast — the caller asked
+ *   for it explicitly).
+ * - "auto" probes and silently falls back to software.
+ */
+async function resolveEncoder(
+  pref: VideoEncoder,
+): Promise<ResolvedVideoEncoder> {
+  if (pref === "software") return "software";
+
+  const hardwareAvailable = await detectVideoToolbox();
+  if (pref === "hardware") {
+    if (!hardwareAvailable) {
+      throw new Error(
+        `Hardware encoder "${VIDEOTOOLBOX_H264}" is not available in this ffmpeg build. ` +
+          `Use encoder "auto" or "software".`,
+      );
+    }
+    return "hardware";
+  }
+  return hardwareAvailable ? "hardware" : "software";
+}
+
+/**
+ * Build the `-c:v …` portion of the ffmpeg command for the resolved encoder.
+ * Hardware uses VideoToolbox constant-quality; software uses libx264 CRF.
+ */
+function buildVideoCodecArgs(
+  encoder: ResolvedVideoEncoder,
+  crf: number,
+  preset: string,
+): string[] {
+  if (encoder === "hardware") {
+    return [
+      "-c:v",
+      VIDEOTOOLBOX_H264,
+      "-q:v",
+      String(crfToVideoToolboxQuality(crf)),
+      "-pix_fmt",
+      "yuv420p",
+    ];
+  }
+  return [
+    "-c:v",
+    "libx264",
+    "-crf",
+    String(crf),
+    "-preset",
+    preset,
+    "-pix_fmt",
+    "yuv420p",
+  ];
+}
 
 /**
  * Build a filter_complex graph using trim/atrim + concat for the given keep segments.
@@ -121,7 +204,10 @@ export async function render(
   keep: Segment[],
   options: RenderOptions = {},
 ): Promise<void> {
-  const { input, output, crf, preset } = config;
+  const { input, output, crf, preset, encoder } = config;
+  const resolvedEncoder = await resolveEncoder(encoder);
+  options.onEncoder?.(resolvedEncoder);
+
   const filterComplex = buildTrimConcatFilter(keep);
 
   const totalKeptMs = keep.reduce(
@@ -140,14 +226,7 @@ export async function render(
     "[v]",
     "-map",
     "[a]",
-    "-c:v",
-    "libx264",
-    "-crf",
-    String(crf),
-    "-preset",
-    preset,
-    "-pix_fmt",
-    "yuv420p",
+    ...buildVideoCodecArgs(resolvedEncoder, crf, preset),
     "-c:a",
     "aac",
     "-b:a",

@@ -10,6 +10,30 @@ struct OutputSettingsView: View {
         @Bindable var appState = appState
         return Form {
             Section("Output") {
+                Picker("Encoder", selection: $appState.preferences.encoder) {
+                    Text("Auto (hardware when available)").tag("auto")
+                    Text("Software (libx264)").tag("software")
+                }
+                .help(
+                    "Auto uses Apple VideoToolbox hardware encoding when available "
+                        + "(much faster), falling back to libx264. Software always uses "
+                        + "libx264, which is slower but more bitrate-efficient."
+                )
+
+                if appState.preferences.encoder == "software" {
+                    Picker("Software preset", selection: $appState.preferences.preset) {
+                        Text("Ultra fast").tag("ultrafast")
+                        Text("Super fast").tag("superfast")
+                        Text("Very fast").tag("veryfast")
+                        Text("Faster").tag("faster")
+                        Text("Fast").tag("fast")
+                        Text("Medium").tag("medium")
+                        Text("Slow").tag("slow")
+                        Text("Slower").tag("slower")
+                    }
+                    .help("Faster presets encode quicker but produce larger files at the same quality.")
+                }
+
                 LabeledContent("Quality (CRF)") {
                     HStack(spacing: 8) {
                         TextField("", value: $appState.preferences.crf, format: .number)

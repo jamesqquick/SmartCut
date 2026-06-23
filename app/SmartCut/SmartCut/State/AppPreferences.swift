@@ -10,7 +10,10 @@ struct AppPreferences: Codable, Equatable, Sendable {
     var whisperModel: String
     var leadInMs: Int
     var tailOutMs: Int
+    /// "auto" (hardware when available), "hardware" (VideoToolbox), or "software" (libx264).
+    var encoder: String
     var crf: Int
+    /// libx264 preset; ignored when the hardware encoder is used.
     var preset: String
     /// Directory where the default output file lands. Empty = next to input.
     var outputDirectory: String?
@@ -23,8 +26,9 @@ struct AppPreferences: Codable, Equatable, Sendable {
         whisperModel: "base.en",
         leadInMs: 300,
         tailOutMs: 300,
+        encoder: "auto",
         crf: 18,
-        preset: "medium",
+        preset: "veryfast",
         outputDirectory: nil
     )
 
@@ -74,6 +78,7 @@ struct AppPreferences: Codable, Equatable, Sendable {
         opts.whisperModel = whisperModel
         opts.leadInMs = leadInMs
         opts.tailOutMs = tailOutMs
+        opts.encoder = encoder
         opts.crf = crf
         opts.preset = preset
         return opts
@@ -89,7 +94,46 @@ struct AppPreferences: Codable, Equatable, Sendable {
         whisperModel = options.whisperModel
         leadInMs = options.leadInMs
         tailOutMs = options.tailOutMs
+        encoder = options.encoder
         crf = options.crf
         preset = options.preset
+    }
+}
+
+extension AppPreferences {
+    /// Tolerant decoding: any key missing from an older `preferences.json`
+    /// falls back to the default value, so adding a new preference never
+    /// invalidates the whole file and wipes a user's saved settings.
+    ///
+    /// Declared in an extension so the synthesized memberwise initializer
+    /// (used by `.default`) is preserved.
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let fallback = AppPreferences.default
+        thresholdDb =
+            try container.decodeIfPresent(Double.self, forKey: .thresholdDb)
+            ?? fallback.thresholdDb
+        minSilence =
+            try container.decodeIfPresent(Double.self, forKey: .minSilence)
+            ?? fallback.minSilence
+        model =
+            try container.decodeIfPresent(String.self, forKey: .model) ?? fallback.model
+        passes =
+            try container.decodeIfPresent(Int.self, forKey: .passes) ?? fallback.passes
+        whisperModel =
+            try container.decodeIfPresent(String.self, forKey: .whisperModel)
+            ?? fallback.whisperModel
+        leadInMs =
+            try container.decodeIfPresent(Int.self, forKey: .leadInMs) ?? fallback.leadInMs
+        tailOutMs =
+            try container.decodeIfPresent(Int.self, forKey: .tailOutMs) ?? fallback.tailOutMs
+        encoder =
+            try container.decodeIfPresent(String.self, forKey: .encoder) ?? fallback.encoder
+        crf = try container.decodeIfPresent(Int.self, forKey: .crf) ?? fallback.crf
+        preset =
+            try container.decodeIfPresent(String.self, forKey: .preset) ?? fallback.preset
+        outputDirectory =
+            try container.decodeIfPresent(String.self, forKey: .outputDirectory)
+            ?? fallback.outputDirectory
     }
 }

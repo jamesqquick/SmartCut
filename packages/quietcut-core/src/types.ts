@@ -3,6 +3,16 @@ export type Segment = {
   end: number; // seconds
 };
 
+/**
+ * Which video encoder the renderer uses for the export pass.
+ * - "auto": prefer hardware (VideoToolbox) when available, else fall back to
+ *   software (libx264). This is the default.
+ * - "hardware": force VideoToolbox; the render fails fast with a clear error
+ *   if the host ffmpeg can't encode H.264 with VideoToolbox.
+ * - "software": always libx264 with the configured `preset`.
+ */
+export type VideoEncoder = "auto" | "hardware" | "software";
+
 export type Config = {
   input: string;
   output: string;
@@ -12,8 +22,9 @@ export type Config = {
   tailOutMs: number; // milliseconds
   skipApproval: boolean;
   dryRun: boolean;
-  crf: number;
-  preset: string;
+  encoder: VideoEncoder;
+  crf: number; // libx264 CRF; mapped to a VideoToolbox -q:v value for hardware
+  preset: string; // libx264 preset; ignored by the hardware encoder
 };
 
 export type DetectionResult = {
@@ -107,6 +118,7 @@ export type SmartcutConfig = {
   tailOutMs: number;
   skipApproval: boolean;
   dryRun: boolean;
+  encoder: VideoEncoder;
   crf: number;
   preset: string;
 };

@@ -398,8 +398,9 @@ function buildConfig(
     tailOutMs: options.tailOutMs ?? 300,
     skipApproval: options.skipApproval ?? false,
     dryRun: options.dryRun ?? false,
+    encoder: options.encoder ?? "auto",
     crf: options.crf ?? 18,
-    preset: options.preset ?? "medium",
+    preset: options.preset ?? "veryfast",
   };
 }
 
