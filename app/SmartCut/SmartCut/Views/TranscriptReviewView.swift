@@ -8,7 +8,6 @@ struct TranscriptReviewView: View {
 
     @State private var audio = AudioPlayer()
     @State private var video = VideoPreviewPlayer()
-    @State private var inspectOpen = false
     @State private var selectionAnchor: Int?
     @State private var wordFrames: [Int: CGRect] = [:]
     /// Cut boundaries captured at the start of a handle drag, used to detect
@@ -33,7 +32,6 @@ struct TranscriptReviewView: View {
             appState.prefetchVideoPreview(forCutAt: 1)
         }
         .onChange(of: currentIndex) {
-            inspectOpen = false
             audio.stop()
             video.stop()
         }
@@ -44,12 +42,12 @@ struct TranscriptReviewView: View {
                 onNudgeStart: { delta in
                     guard let cut = currentCut else { return }
                     appState.adjustCutStart(cut.opId, to: cut.removeStartIndex + delta)
-                    if inspectOpen { playVideoPreview() }
+                    playVideoPreview()
                 },
                 onNudgeEnd: { delta in
                     guard let cut = currentCut else { return }
                     appState.adjustCutEnd(cut.opId, to: cut.removeEndIndex + delta)
-                    if inspectOpen { playVideoPreview() }
+                    playVideoPreview()
                 }
             )
         )
@@ -148,7 +146,7 @@ struct TranscriptReviewView: View {
             transcriptPane
             Divider().background(Theme.border)
             actionBar
-            if inspectOpen { inspectPanel }
+            inspectPanel
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
@@ -299,12 +297,11 @@ struct TranscriptReviewView: View {
         }
     }
 
-    /// On drag-end: if the boundaries actually moved and the video panel is open,
-    /// re-render the clip (showing the loading state). Single render per drag.
+    /// On drag-end: if the boundaries actually moved, re-render the clip
+    /// (showing the loading state). Single render per drag.
     private func regenerateVideoAfterDrag(_ opId: String) {
         defer { preDragBounds = nil }
-        guard inspectOpen,
-              let snapshot = preDragBounds,
+        guard let snapshot = preDragBounds,
               let cut = currentCut, cut.opId == opId,
               cut.removeStartIndex != snapshot.start || cut.removeEndIndex != snapshot.end
         else { return }
@@ -473,17 +470,17 @@ struct TranscriptReviewView: View {
     }
 
     private var videoButton: some View {
-        actionButton(systemImage: inspectOpen ? "video.fill" : "video",
+        actionButton(systemImage: "video",
                      label: "Video", keycap: "V",
-                     color: Theme.indigo, isActive: inspectOpen) { toggleInspect() }
+                     color: Theme.indigo, isActive: false) { replayVideo() }
         .keyboardShortcut("v", modifiers: [])
-        .help("Watch the resulting video clip (V)")
+        .help("Replay the video clip preview (V)")
     }
 
     private var rejectButton: some View {
         actionButton(systemImage: "xmark", label: "Reject", keycap: "⌫",
                      color: Theme.danger, isActive: currentCut?.status == .rejected) {
-            appState.rejectCurrent(); inspectOpen = false; audio.stop(); video.stop()
+            appState.rejectCurrent(); audio.stop(); video.stop()
         }
         .keyboardShortcut(.delete, modifiers: [])
         .help("Keep these words — reject the cut (Del)")
@@ -492,7 +489,7 @@ struct TranscriptReviewView: View {
     private var approveButton: some View {
         actionButton(systemImage: "checkmark", label: "Approve", keycap: "↵",
                      color: Theme.good, isActive: currentCut?.status == .approved) {
-            appState.approveCurrent(); inspectOpen = false; audio.stop(); video.stop()
+            appState.approveCurrent(); audio.stop(); video.stop()
         }
         .keyboardShortcut(.return, modifiers: [])
         .help("Remove these words — approve the cut (Return)")
@@ -522,9 +519,8 @@ struct TranscriptReviewView: View {
         }
     }
 
-    private func toggleInspect() {
-        inspectOpen.toggle()
-        if inspectOpen { playVideoPreview() } else { video.stop() }
+    private func replayVideo() {
+        playVideoPreview()
     }
 
     private func playVideoPreview() {
@@ -609,21 +605,18 @@ struct TranscriptReviewView: View {
             if appState.currentCutIndex < cuts.count - 1 { appState.navigateTo(appState.currentCutIndex + 1) }
             return .handled
         case .return where press.modifiers.isEmpty:
-            appState.approveCurrent(); inspectOpen = false; audio.stop(); video.stop()
+            appState.approveCurrent(); audio.stop(); video.stop()
             return .handled
         case .delete where press.modifiers.isEmpty:
-            appState.rejectCurrent(); inspectOpen = false; audio.stop(); video.stop()
+            appState.rejectCurrent(); audio.stop(); video.stop()
             return .handled
         case KeyEquivalent("a") where press.modifiers.isEmpty:
             if audio.isPlaying || audio.isLoading { audio.stop() } else { playAudioPreview() }
             return .handled
         case KeyEquivalent("v") where press.modifiers.isEmpty:
-            // V always shows + (re)plays the clip; it never closes the panel.
-            if !inspectOpen { inspectOpen = true }
             playVideoPreview()
             return .handled
         case .escape:
-            if inspectOpen { inspectOpen = false; video.stop(); return .handled }
             return .ignored
         // ⇧←/→ and ⌥←/→ are handled by BoundaryKeyMonitor (NSEvent level),
         // not here, because AppKit consumes modified arrows before onKeyPress.
